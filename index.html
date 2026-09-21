@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <!-- 刻意不加 maximum-scale / user-scalable=no：那會讓使用者無法放大，
+       是 WCAG 1.4.4 的明確違反項。處理鍵盤遮擋的是
+       interactive-widget=resizes-content，跟縮放無關。 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>OC 角色卡存檔區 | OC Card Archive</title>
+
+  <!-- 分頁上的小圖示。manifest 裡的圖示只給「安裝成 app」用，瀏覽器分頁
+       不會拿來當 favicon，少了這幾行分頁會是空白預設圖。另外 /favicon.ico
+       的自動請求是打在網域根目錄，但這個 app 部署在子路徑下，靠不到，
+       所以一定要明寫出來。 -->
+  <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+
+  <!-- PWA：可安裝到主畫面、離線可用。manifest 的 start_url / scope 用相對
+       路徑，GitHub Pages 的子路徑與本機執行才能共用同一份設定。 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#F3EEE2">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="OC 卡片">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="ui-tokens.css">
+  <link rel="stylesheet" href="style.css">
+
+  <!-- 主題要在 CSS 生效前就定下來，否則夜間模式每次開啟都會先閃一下白畫面。
+       這份是 js/theme.js 的極短版，邏輯必須跟那邊一致（key 也是）。 -->
+  <script>
+    (function () {
+      try {
+        var p = localStorage.getItem("oc_theme");
+        if (p !== "light" && p !== "dark") {
+          p = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
+            ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", p);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+</head>
+<body data-view="wall">
+
+  <!-- 最左側直欄：作品（手機版變成從左邊滑出來的抽屜） -->
+  <div class="rail-overlay" id="railOverlay"></div>
+  <aside class="group-rail" id="groupRail">
+    <button class="rail-btn add-btn" title="新增作品" onclick="promptCreateGroup()">＋</button>
+    <div class="rail-list" id="groupRailList"></div>
+    <button class="rail-btn" title="設定" onclick="openSettingsModal()">⚙️</button>
+  </aside>
+
+  <div class="app-main">
+
+    <!-- ========== 檢視一：卡片牆 ========== -->
+    <section class="view view-wall" id="viewWall">
+      <header class="top-bar">
+        <div class="top-left">
+          <button class="icon-btn mobile-only" title="作品列表" onclick="toggleRailMobile()">☰</button>
+          <div class="group-badge" title="目前的作品（長按左側圖示可以改名）">
+            <span id="currentGroupIcon">🎭</span>
+            <span id="currentGroupName">我的角色</span>
+          </div>
+          <span class="wall-count" id="wallCountText"></span>
+        </div>
+
+        <div class="top-right">
+          <div class="search-box">
+            <span class="search-lens">🔍</span>
+            <input type="text" id="searchInput" class="search-input" placeholder="搜尋名字、標籤、設定內容…（按 / ）"
+                   oninput="handleSearchInput(this)" autocomplete="off">
+            <button type="button" id="searchClearBtn" class="search-clear" title="清空搜尋" onclick="clearSearch()">✕</button>
+          </div>
+          <select id="sortSelect" class="sort-select" title="排序方式" onchange="changeSortMode(this.value)" aria-label="排序方式">
+            <option value="updated">最近修改</option>
+            <option value="created">建立時間</option>
+            <option value="name">名稱</option>
+            <option value="color">分類顏色</option>
+          </select>
+          <button class="icon-btn" title="批次模式（選取多張卡片）" onclick="toggleBatchMode()">☑️</button>
+          <button class="icon-btn" title="匯出" onclick="openExportModal()">📤</button>
+          <button class="btn btn-primary new-card-btn" onclick="createCard()">＋ 新角色</button>
+        </div>
+      </header>
+
+      <div class="filter-bar">
+        <button class="filter-chip fav-chip" id="favFilterBtn" onclick="toggleFavFilter()" aria-pressed="false">★ 我的最愛</button>
+        <div class="color-filter" id="colorFilterRow"></div>
+        <div class="tag-filter" id="tagFilterRow"></div>
+        <button class="filter-chip clear-chip" id="clearFilterBtn" onclick="clearAllFilters()" style="display:none;">✕ 清除篩選</button>
+      </div>
+
+      <div class="batch-bar" id="batchBar">
+        <span id="batchCountText">批次模式：點卡片來選取</span>
+        <div class="batch-actions">
+          <button class="btn btn-secondary" onclick="batchSelectAll()">全選畫面上的</button>
+          <button class="btn btn-secondary" onclick="openExportModal()">匯出選取</button>
+          <button class="btn btn-danger" onclick="batchDelete()">移到垃圾桶</button>
+          <button class="btn btn-secondary" onclick="toggleBatchMode()">結束批次</button>
+        </div>
+      </div>
+
+      <div class="wall-scroll" id="wallScroll">
+        <div class="card-wall" id="cardWall"></div>
+      </div>
+    </section>
+
+    <!-- ========== 檢視二：編輯一張卡 ========== -->
+    <section class="view view-edit" id="viewEdit">
+      <header class="top-bar">
+        <div class="top-left">
+          <button class="icon-btn" title="回到卡片牆" onclick="exitEditor()">←</button>
+          <h1 class="editor-title" id="editorTitle">新角色卡</h1>
+          <span class="save-mark" id="editorSaveMark">已儲存</span>
+        </div>
+        <div class="top-right">
+          <button class="icon-btn" title="複製成另一張卡" onclick="duplicateEditingCard()">⧉</button>
+          <button class="icon-btn danger" title="移到垃圾桶" onclick="deleteEditingCard()">🗑️</button>
+          <button class="btn btn-primary" onclick="exitEditor()">完成</button>
+        </div>
+      </header>
+
+      <div class="edit-scroll" id="editScroll">
+        <div class="edit-inner">
+
+          <div class="edit-identity">
+            <div class="avatar-col">
+              <button type="button" class="editor-avatar" id="editorAvatar" title="換一個符號" onclick="openIconPickerForCard()"></button>
+              <div class="avatar-btns">
+                <button type="button" class="mini-btn" onclick="triggerAvatarPick()">上傳圖片</button>
+                <button type="button" class="mini-btn" onclick="openIconPickerForCard()">選符號</button>
+                <button type="button" class="mini-btn danger" id="avatarRemoveBtn" onclick="removeAvatar()" style="display:none;">移除圖片</button>
+              </div>
+              <input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="handleAvatarFile(event)">
+            </div>
+
+            <div class="identity-col">
+              <label class="field-label" for="fieldName">角色名稱</label>
+              <input type="text" id="fieldName" class="text-input big" placeholder="她／他叫什麼？"
+                     oninput="editorSetName(this.value)" autocomplete="off">
+
+              <label class="field-label" for="fieldAlias">別名／稱號</label>
+              <input type="text" id="fieldAlias" class="text-input" placeholder="外號、代號、別人怎麼叫他"
+                     oninput="editorSetAlias(this.value)" autocomplete="off">
+
+              <label class="field-label" for="fieldTagline">一句話簡介</label>
+              <textarea id="fieldTagline" class="text-input" rows="2"
+                        placeholder="如果只能用一句話介紹這個角色，你會怎麼說？"
+                        oninput="editorSetTagline(this.value)"></textarea>
+
+              <div class="meter-row">
+                <div class="meter"><span id="editorMeterBar"></span></div>
+                <span class="meter-text" id="editorMeterText"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="edit-block">
+            <div class="block-head">
+              <h2>分類與作品</h2>
+              <span class="block-hint" id="editorColorName"></span>
+            </div>
+            <div class="palette-row-wrap" id="editorColorRow"></div>
+            <label class="field-label" for="editorGroupSelect">收在哪個作品裡</label>
+            <select id="editorGroupSelect" class="text-input" onchange="editorChangeGroup(this.value)"></select>
+          </div>
+
+          <div class="edit-block">
+            <div class="block-head">
+              <h2>資料列</h2>
+              <span class="block-hint">短短一行的東西（性別、年齡、身高…），欄位名稱可以自己改</span>
+            </div>
+            <div id="editorFieldList"></div>
+            <button type="button" class="add-row-btn" id="addFieldBtn" onclick="addEditorField()">＋ 加一列</button>
+          </div>
+
+          <div class="edit-block">
+            <div class="block-head">
+              <h2>設定段落</h2>
+              <span class="block-hint">大段的文字（外觀、性格、背景、關係…），順序可以調</span>
+            </div>
+            <div id="editorSectionList"></div>
+            <button type="button" class="add-row-btn" id="addSectionBtn" onclick="addEditorSection()">＋ 加一個段落</button>
+          </div>
+
+          <div class="edit-block">
+            <div class="block-head">
+              <h2>標籤</h2>
+              <span class="block-hint">用逗號或空白分隔，離開輸入框就會整理好</span>
+            </div>
+            <input type="text" id="fieldTags" class="text-input" placeholder="騎士、主角群、劍"
+                   onblur="editorCommitTags()" autocomplete="off">
+            <div class="suggest-row" id="tagSuggestRow"></div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ========== 卡片詳情 ========== -->
+  <div class="modal-overlay" id="cardDetailModal">
+    <div class="modal-card wide">
+      <div id="cardDetailBody"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="detailFavBtn" onclick="toggleOpenedFavorite()">☆ 我的最愛</button>
+        <button class="btn btn-secondary" onclick="copyOpenedCardText()">複製文字</button>
+        <button class="btn btn-secondary" onclick="duplicateOpenedCard()">複製卡片</button>
+        <button class="btn btn-danger" onclick="deleteOpenedCard()">刪除</button>
+        <button class="btn btn-primary" onclick="editOpenedCard()">編輯</button>
+        <button class="btn btn-secondary" onclick="closeCardDetail()">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 作品設定 ========== -->
+  <div class="modal-overlay" id="groupModal">
+    <div class="modal-card">
+      <h2 class="modal-title">作品設定</h2>
+      <div class="group-edit-row">
+        <button type="button" class="group-icon-btn" id="groupIconBtn" title="更換圖示" onclick="openGroupIconPicker()">📁</button>
+        <input type="text" id="groupNameInput" class="text-input" placeholder="作品名稱">
+      </div>
+      <p class="modal-hint" id="groupCardCount"></p>
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="groupDeleteBtn" onclick="deleteGroup()">刪除作品</button>
+        <button class="btn btn-secondary" onclick="closeGroupModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveGroupEdit()">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 分類設定 ========== -->
+  <div class="modal-overlay" id="paletteModal">
+    <div class="modal-card">
+      <h2 class="modal-title">分類設定</h2>
+      <p class="modal-hint">顏色固定七種，名稱可以改成你自己的分類方式。</p>
+      <div id="paletteList"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="resetPaletteNames()">還原預設名稱</button>
+        <button class="btn btn-primary" onclick="closePaletteModal()">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 垃圾桶 ========== -->
+  <div class="modal-overlay" id="trashModal">
+    <div class="modal-card wide">
+      <h2 class="modal-title">垃圾桶</h2>
+      <p class="modal-hint" id="trashHint"></p>
+      <div id="trashList" class="trash-list"></div>
+      <div class="modal-actions">
+        <button class="btn btn-danger" onclick="emptyTrash()">清空垃圾桶</button>
+        <button class="btn btn-primary" onclick="closeTrashModal()">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 匯出 ========== -->
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal-card">
+      <h2 class="modal-title">匯出</h2>
+      <label class="field-label" for="exportScope">要匯出哪些卡片</label>
+      <select id="exportScope" class="text-input"></select>
+
+      <div class="export-options">
+        <button class="export-opt" onclick="exportAsJSON()">
+          <strong>JSON（卡片）</strong>
+          <span>可以再匯回這個工具，格式完整。</span>
+        </button>
+        <button class="export-opt" onclick="exportAsWorldviewJSON()">
+          <strong>JSON（給世界觀架構工作台）</strong>
+          <span>轉成那邊看得懂的文檔，在那邊選「匯入」就會變成一批角色文檔。</span>
+        </button>
+        <button class="export-opt" onclick="exportAsHTML()">
+          <strong>HTML 卡片頁</strong>
+          <span>一頁可以直接看、可以列印，給別人看用這個。</span>
+        </button>
+        <button class="export-opt" onclick="exportAsTXT()">
+          <strong>純文字 TXT</strong>
+          <span>貼到哪裡都行。</span>
+        </button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="exportFullBackup()">下載完整備份</button>
+        <button class="btn btn-primary" onclick="closeExportModal()">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 設定總表 ========== -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-card">
+      <h2 class="modal-title">設定</h2>
+      <div class="settings-list">
+        <button class="settings-row" onclick="settingsGoTo(openAppearanceModal)">
+          <span>🌓 外觀</span><span class="settings-value" id="appearanceRowValue"></span>
+        </button>
+        <button class="settings-row" onclick="settingsGoTo(openPaletteModal)">
+          <span>🎨 分類設定</span><span class="settings-value">七種分類的名稱</span>
+        </button>
+        <button class="settings-row" onclick="settingsGoTo(openExportModal)">
+          <span>📤 匯出</span><span class="settings-value">JSON／HTML／TXT</span>
+        </button>
+        <button class="settings-row" onclick="settingsGoTo(triggerImportFile)">
+          <span>📥 匯入</span><span class="settings-value">JSON 檔案</span>
+        </button>
+        <button class="settings-row" onclick="settingsGoTo(openTrashModal)">
+          <span>🗑️ 垃圾桶</span><span class="settings-value" id="trashRowValue"></span>
+        </button>
+        <div class="settings-row is-static">
+          <span>💾 本機用量</span><span class="settings-value" id="storageRowValue"></span>
+        </div>
+        <div class="settings-row is-static">
+          <span>📊 目前收藏</span><span class="settings-value" id="statsRowValue"></span>
+        </div>
+      </div>
+      <p class="modal-hint">資料存在這台裝置的瀏覽器裡，換裝置不會跟著走——重要的設定請定期匯出備份。</p>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="closeSettingsModal()">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 外觀 ========== -->
+  <div class="modal-overlay" id="appearanceModal">
+    <div class="modal-card">
+      <h2 class="modal-title">外觀</h2>
+      <div class="theme-choice" id="themeChoiceRow">
+        <button class="theme-opt" data-theme="auto" onclick="setThemePref('auto')">跟隨系統</button>
+        <button class="theme-opt" data-theme="light" onclick="setThemePref('light')">日間</button>
+        <button class="theme-opt" data-theme="dark" onclick="setThemePref('dark')">夜間</button>
+      </div>
+      <p class="modal-hint" id="themeAutoHint"></p>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="closeAppearanceModal()">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 圖示選擇器 ========== -->
+  <div class="modal-overlay" id="iconPickerModal">
+    <div class="modal-card">
+      <h2 class="modal-title">選一個符號</h2>
+      <div class="icon-grid" id="iconPickerGrid"></div>
+      <div class="icon-custom-row">
+        <input type="text" id="iconCustomInput" class="text-input" placeholder="或自己貼一個 emoji" maxlength="8">
+        <button class="btn btn-secondary" onclick="applyCustomIcon()">使用</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeIconPicker()">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 儲存空間滿了 ========== -->
+  <div class="modal-overlay" id="storageFullModal">
+    <div class="modal-card">
+      <h2 class="modal-title">⚠️ 這次的修改沒有存進這台裝置</h2>
+      <p class="modal-hint" id="storageFullDetail"></p>
+      <p class="modal-hint" id="storageFullHint"></p>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="exportFullBackup()">立刻下載備份</button>
+        <button class="btn btn-secondary" onclick="closeStorageFullModal()">我知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 其他分頁改過資料 ========== -->
+  <div class="modal-overlay" id="otherTabModal">
+    <div class="modal-card">
+      <h2 class="modal-title">另一個分頁也在編輯</h2>
+      <p class="modal-hint" id="otherTabInfo"></p>
+      <p class="modal-hint">重新載入會採用另一個分頁存的那一份，這個分頁還沒存的修改會遺失。</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeOtherTabModal()">留在這一份</button>
+        <button class="btn btn-primary" onclick="reloadForOtherTab()">重新載入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 有新版本 ========== -->
+  <div class="modal-overlay" id="updateModal">
+    <div class="modal-card">
+      <h2 class="modal-title">有新版本</h2>
+      <p class="modal-hint">重新載入就會換成新版。你的卡片都存在本機，不會受影響。</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="dismissUpdateModal()">稍後</button>
+        <button class="btn btn-primary" onclick="reloadForUpdate()">重新載入</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="importFileInput" accept=".json,application/json" style="display:none;" onchange="handleImportFileSelected(event)">
+  <div class="toast" id="toast"></div>
+
+  <!-- 載入順序有相依性：state.js 定義常數與 safeStorage*，main.js 的純函式
+       （isSafeImageSrc、dedupeTags、formatTime）在 storage.js 載入時就會被
+       呼叫到，所以 main.js 必須排在 storage.js 前面。改順序前請先看
+       tests/shell-manifest.test.js。 -->
+  <script src="js/state.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/cards.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/modal.js"></script>
+  <script src="js/import-export.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
