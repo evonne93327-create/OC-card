@@ -1,0 +1,34 @@
+{
+  "name": "OC 角色卡存檔區",
+  "short_name": "OC 卡片",
+  "description": "把 OC 的人物設定做成一張一張的卡片收好：欄位、長文段落、標籤、頭像，可離線使用，也能匯出到世界觀架構工作台。",
+  "lang": "zh-TW",
+  "dir": "ltr",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FFFCF6",
+  "theme_color": "#F3EEE2",
+  "categories": ["productivity", "books", "lifestyle"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,196 @@
+/* ==========================================================
+   ui-tokens.css
+   全站設計變數（Design Tokens）。style.css 的所有元件樣式
+   都只「引用」這裡的變數，不直接寫死數字。
+
+   變數名稱與配色刻意跟姊妹專案「世界觀架構工作台」(world_2) 一致：
+   兩邊看起來要像同一套產品的兩個房間，而且哪天要把這個存檔區併進去，
+   樣式可以整份搬過去不用改名。
+   ========================================================== */
+
+:root {
+
+  /* ---------- 顏色 Colors ---------- */
+  --bg-main: #F3EEE2;
+  --bg-sidebar: #FFFDF8;
+  --bg-rail: #EAE3D2;
+  --bg-card: #FFFDF8;
+  --bg-sunken: #ECE5D4;
+  --border: #E1D7C1;
+  --border-soft: #EBE2CC;
+  --border-focus: #5A6D82;
+
+  --text-primary: #2A2420;
+  --text-secondary: #6E6152;
+  --text-muted: #A0937E;
+
+  --accent: #AC3B2A;
+  --accent-hover: #8C2E20;
+  /* 強調色拿來「寫字」時用這個。填色按鈕可以用飽和一點的色塊，
+     同一個顏色變成細細的筆畫就不夠讀了——夜間差別特別明顯。 */
+  --accent-text: #AC3B2A;
+  --accent-light: #F6E2DA;
+  --accent-line: #E6BBAC;
+
+  --jade: #3C6357;
+  --jade-light: #E1ECE7;
+
+  --danger: #B23A2E;
+  --danger-hover: #93291F;
+  --danger-light: #F7E1DC;
+
+  /* 鋪在 accent／danger 底色上的文字。夜間的強調色是亮的，
+     再壓白字會看不清楚，所以這個值兩個主題是相反的。 */
+  --on-accent: #FFFFFF;
+
+  --select-bg: #E2EAF4;        /* 批次選取中的卡片 */
+  --select-border: #BCCFDF;
+  --select-text: #1E3A5F;
+  --mark-bg: #FFE9A8;          /* 搜尋關鍵字標示 */
+  --star: #D9A62B;             /* 我的最愛 */
+  --meter-track: #E4DCCB;      /* 完成度量表的底 */
+
+  /* ---------- 陰影 Shadow ---------- */
+  --shadow-sm: 0 1px 2px rgba(42,36,32,0.06);
+  --shadow-md: 0 6px 18px rgba(42,36,32,0.10);
+  --shadow-lg: 0 16px 40px -8px rgba(42,36,32,0.22);
+
+  /* ---------- 安全區域（瀏海/手勢列） ---------- */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+
+
+  /* ==========================================================
+     字體 Font
+     ========================================================== */
+  --font-ui: 'Plus Jakarta Sans', 'Noto Sans TC', system-ui, -apple-system, sans-serif;
+  --font-display: 'Noto Serif TC', 'Plus Jakarta Sans', serif;
+
+  /* 字級：命名 = 實際 px 值，方便直接對照，不用另外查表。 */
+  --fs-10: 10px;   /* 徽章、輔助文字 */
+  --fs-12: 12px;   /* 按鈕／選單／輸入框標準字級（用最多） */
+  --fs-14: 14px;   /* 卡片內文、表單輸入框 */
+  --fs-16: 16px;   /* 段落、次標題 */
+  --fs-18: 18px;   /* 卡片名字、圖示 */
+  --fs-20: 20px;   /* 區塊標題 */
+  --fs-22: 22px;   /* 詳情視窗的角色名 */
+  --fs-28: 28px;   /* 卡片頭像 emoji */
+  --fs-40: 40px;   /* 詳情視窗頭像 emoji */
+
+
+  /* ==========================================================
+     間距 Spacing — 命名 = 實際 px 值
+     ========================================================== */
+  --sp-2: 2px;
+  --sp-4: 4px;
+  --sp-5: 5px;
+  --sp-6: 6px;
+  --sp-8: 8px;
+  --sp-10: 10px;
+  --sp-12: 12px;
+  --sp-14: 14px;
+  --sp-16: 16px;
+  --sp-18: 18px;
+  --sp-20: 20px;
+  --sp-22: 22px;
+  --sp-24: 24px;
+  --sp-28: 28px;
+  --sp-32: 32px;
+  --sp-40: 40px;
+
+
+  /* ==========================================================
+     圓角 Radius
+     ========================================================== */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-4: 4px;
+  --radius-8: 8px;
+  --radius-pill: 12px;
+  --radius-round: 20px;
+  --radius-full: 50%;
+
+
+  /* ==========================================================
+     Icon 尺寸（正方形圖示按鈕，寬高皆為此值）
+     ========================================================== */
+  --icon-10: 10px;  /* 顏色篩選的小圓點 */
+  --icon-18: 18px;
+  --icon-22: 22px;  /* 搜尋框的清空鈕 */
+  --icon-24: 24px;
+  --icon-28: 28px;  /* icon-sm-btn（桌面） */
+  --icon-40: 40px;  /* rail 按鈕（手機） */
+  --icon-44: 44px;  /* rail 按鈕（桌面） */
+
+  /* 卡片牆的一張卡有多寬。grid 用 auto-fill + minmax 排，
+     這個值決定「一排放得下幾張」，手機版會在 style.css 裡改小。 */
+  --card-w: 210px;
+  --card-avatar: 64px;
+
+  /* 層級由低到高。手機版的作品抽屜是整片蓋過來的，
+     所以它跟它的遮罩都要排在浮動按鈕之上。 */
+  --z-floating: 92;
+  --z-rail-overlay: 93;
+  --z-rail-drawer: 94;
+  --z-modal: 100;
+  --z-toast: 110;
+}
+
+/* ==========================================================
+   夜間模式
+
+   只覆蓋顏色，字級／間距／圓角／層級一律沿用上面那份。
+
+   不用 @media (prefers-color-scheme) 做樣式切換，而是由 js/theme.js
+   把解析後的結果寫成 <html data-theme="light|dark">。理由是卡片的標籤
+   底色是 JS 直接寫進 style 的，CSS 的媒體查詢管不到；讓 JS 成為唯一的
+   判斷來源，兩邊才不會各自解讀、出現一半亮一半暗的畫面。
+
+   配色維持暖調（咖啡／奶油），夜間看起來才像同一個產品的另一面。
+   ========================================================== */
+
+:root[data-theme="dark"] {
+  --bg-main: #1E1A16;
+  --bg-sidebar: #26221C;
+  --bg-rail: #15120F;
+  --bg-card: #26221C;
+  /* 日間的 bg-sunken 比卡片暗，是「凹進去」的意思。深色底下沿用同一個
+     邏輯會讓搜尋框、頂部按鈕這些控制項比周圍更暗，看起來像洞不像按鈕。
+     夜間反過來做成「浮起來」——比卡片亮一階。 */
+  --bg-sunken: #383128;
+  --border: #3B342B;
+  --border-soft: #2E2821;
+  --border-focus: #8FA4BC;
+
+  --text-primary: #D6CFC5;
+  --text-secondary: #BCB0A0;
+  --text-muted: #A89C8B;
+
+  /* 原本的磚紅 #AC3B2A 在深色底上會沉下去，提亮並降一點彩度 */
+  --accent: #C4634F;
+  --accent-hover: #D9755F;
+  --accent-text: #D2775F;
+  --accent-light: #3B2520;
+  --accent-line: #71392D;
+  --on-accent: #1C0D09;
+
+  --jade: #7FB9A4;
+  --jade-light: #22322C;
+
+  --danger: #E4786C;
+  --danger-hover: #F09184;
+  --danger-light: #3C231F;
+
+  /* 深色底上的陰影要靠純黑才看得出來，原本那組帶暖色的會整個消失 */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.45);
+  --shadow-md: 0 6px 18px rgba(0,0,0,0.42);
+  --shadow-lg: 0 16px 40px -8px rgba(0,0,0,0.60);
+
+  --select-bg: #1F2A36;
+  --select-border: #3A5066;
+  --select-text: #A8C6E2;
+  --mark-bg: #6B5320;
+  --star: #E0BC56;
+  --meter-track: #3A332A;
+}
