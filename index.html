@@ -49,164 +49,225 @@
 </head>
 <body data-view="wall">
 
-  <!-- 最左側直欄：作品（手機版變成從左邊滑出來的抽屜） -->
-  <div class="rail-overlay" id="railOverlay"></div>
-  <aside class="group-rail" id="groupRail">
-    <button class="rail-btn add-btn" title="新增作品" onclick="promptCreateGroup()">＋</button>
-    <div class="rail-list" id="groupRailList"></div>
-    <button class="rail-btn" title="設定" onclick="openSettingsModal()">⚙️</button>
+  <!-- 最左側作品直欄（手機版自動轉為置底橫列） -->
+  <aside class="world-rail" id="appWorldRail">
+    <button class="world-rail-btn add-btn" title="新增作品" onclick="promptCreateGroup()">＋</button>
+    <div class="world-rail-list" id="groupRailList"></div>
+    <button class="world-rail-btn" id="settingsRailBtn" title="設定" onclick="openSettingsModal()">⚙️</button>
   </aside>
 
-  <div class="app-main">
+  <!-- 中間欄：角色清單（手機版變成從左邊滑出來的抽屜） -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebarMobile()"></div>
+  <aside class="sidebar-directory" id="appSidebar">
+    <div class="directory-top-bar">
+      <span class="directory-title">角色清單</span>
+      <div class="dir-btn-group">
+        <button class="icon-sm-btn" id="batchToggleBtn" title="批次模式（一次選多張）" onclick="toggleBatchMode()">☑️</button>
+        <button class="icon-sm-btn" title="新增角色卡" onclick="createCard()">👤</button>
+        <button class="icon-sm-btn mobile-close" title="收起清單" onclick="closeSidebarMobile()">✕</button>
+      </div>
+    </div>
 
-    <!-- ========== 檢視一：卡片牆 ========== -->
-    <section class="view view-wall" id="viewWall">
-      <header class="top-bar">
-        <div class="top-left">
-          <button class="icon-btn mobile-only" title="作品列表" onclick="toggleRailMobile()">☰</button>
-          <div class="group-badge" title="目前的作品（長按左側圖示可以改名）">
-            <span id="currentGroupIcon">🎭</span>
-            <span id="currentGroupName">我的角色</span>
-          </div>
+    <!-- 批次模式列 -->
+    <div class="batch-bar" id="batchBar">
+      <span id="batchCountText">批次模式：點卡片來選取</span>
+      <button class="btn btn-danger" onclick="batchDelete()">刪除</button>
+    </div>
+
+    <div class="search-wrap">
+      <div class="search-row">
+        <div class="search-box-inner">
+          <span class="search-lens-icon">🔍</span>
+          <input type="text" id="searchInput" class="search-input-box" placeholder="搜尋角色、標籤、設定內容…"
+                 oninput="handleSearchInput(this)" autocomplete="off">
+          <button type="button" id="searchClearBtn" class="search-clear-btn" title="清空搜尋" onclick="clearSearch()">✕</button>
+        </div>
+        <button type="button" id="filterToggleBtn" class="icon-sm-btn filter-toggle-btn" title="篩選" onclick="toggleFilterPanel()">🏷️</button>
+      </div>
+
+      <!-- 篩選面板：預設收著，按 🏷️ 才展開。
+           篩選條件平常不用看，但一旦有條件生效，上方的狀態列會講清楚。 -->
+      <div class="filter-panel" id="filterPanel">
+        <div class="filter-group">
+          <span class="filter-group-label">分類</span>
+          <div class="color-filter-row" id="colorFilterRow"></div>
+        </div>
+        <div class="filter-group" id="tagFilterGroup">
+          <span class="filter-group-label">標籤</span>
+          <div class="tag-filter-row" id="tagFilterRow"></div>
+        </div>
+        <div class="filter-group">
+          <button class="filter-chip fav-chip" id="favFilterBtn" onclick="toggleFavFilter()" aria-pressed="false">★ 只看我的最愛</button>
+          <button class="filter-chip clear-chip" onclick="clearAllFilters()">✕ 清除全部條件</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="directory-tree-area" id="charList"></div>
+
+    <div class="directory-footer">
+      <button class="btn btn-secondary" onclick="openPaletteModal()">🎨 分類設定</button>
+      <button class="btn btn-secondary" onclick="openTrashModal()">🗑️ 垃圾桶</button>
+    </div>
+  </aside>
+
+  <!-- 右側主區域 -->
+  <div class="app-main-layout">
+    <header class="top-nav-bar">
+      <div class="nav-group-left">
+        <button class="nav-btn-icon" id="sidebarToggleBtn" onclick="toggleSidebarMenu()" title="展開/收納角色清單">☰</button>
+        <!-- 只是顯示「現在在哪個作品」，點下去不做事。
+             要改名或換圖示請長按（或右鍵）左邊作品列上的那顆按鈕。 -->
+        <div class="nav-world-btn is-static" id="groupBadge" title="目前的作品（長按左側的作品圖示可以改名或換圖示）">
+          <span id="currentGroupIcon">🎭</span>
+          <span id="currentGroupName">我的角色</span>
+        </div>
+      </div>
+
+      <div class="nav-group-center">
+        <div class="tab-switch-box">
+          <button class="tab-btn active" id="tabWallBtn" onclick="switchView('wall')">🎴 卡片牆</button>
+          <button class="tab-btn" id="tabCardBtn" onclick="switchView('card')">📇 角色卡</button>
+        </div>
+      </div>
+
+      <div class="nav-group-right">
+        <button class="nav-action-btn secondary" onclick="openExportModal()" title="匯出">📤<span class="btn-text">匯出</span></button>
+        <button class="nav-action-btn primary" onclick="createCard()" title="新增角色卡">＋<span class="btn-text">新角色</span></button>
+      </div>
+    </header>
+
+    <main class="content-workspace">
+
+      <!-- ========== 檢視一：卡片牆 ========== -->
+      <section class="view-panel" id="viewWall">
+        <div class="wall-bar">
           <span class="wall-count" id="wallCountText"></span>
-        </div>
-
-        <div class="top-right">
-          <div class="search-box">
-            <span class="search-lens">🔍</span>
-            <input type="text" id="searchInput" class="search-input" placeholder="搜尋名字、標籤、設定內容…（按 / ）"
-                   oninput="handleSearchInput(this)" autocomplete="off">
-            <button type="button" id="searchClearBtn" class="search-clear" title="清空搜尋" onclick="clearSearch()">✕</button>
+          <div class="wall-active-filters" id="wallActiveFilters"></div>
+          <div class="wall-bar-right">
+            <select id="sortSelect" class="sort-select" title="排序方式" onchange="changeSortMode(this.value)" aria-label="排序方式">
+              <option value="updated">最近修改</option>
+              <option value="created">建立時間</option>
+              <option value="name">名稱</option>
+              <option value="color">分類顏色</option>
+            </select>
           </div>
-          <select id="sortSelect" class="sort-select" title="排序方式" onchange="changeSortMode(this.value)" aria-label="排序方式">
-            <option value="updated">最近修改</option>
-            <option value="created">建立時間</option>
-            <option value="name">名稱</option>
-            <option value="color">分類顏色</option>
-          </select>
-          <button class="icon-btn" title="批次模式（選取多張卡片）" onclick="toggleBatchMode()">☑️</button>
-          <button class="icon-btn" title="匯出" onclick="openExportModal()">📤</button>
-          <button class="btn btn-primary new-card-btn" onclick="createCard()">＋ 新角色</button>
         </div>
-      </header>
 
-      <div class="filter-bar">
-        <button class="filter-chip fav-chip" id="favFilterBtn" onclick="toggleFavFilter()" aria-pressed="false">★ 我的最愛</button>
-        <div class="color-filter" id="colorFilterRow"></div>
-        <div class="tag-filter" id="tagFilterRow"></div>
-        <button class="filter-chip clear-chip" id="clearFilterBtn" onclick="clearAllFilters()" style="display:none;">✕ 清除篩選</button>
-      </div>
-
-      <div class="batch-bar" id="batchBar">
-        <span id="batchCountText">批次模式：點卡片來選取</span>
-        <div class="batch-actions">
-          <button class="btn btn-secondary" onclick="batchSelectAll()">全選畫面上的</button>
-          <button class="btn btn-secondary" onclick="openExportModal()">匯出選取</button>
-          <button class="btn btn-danger" onclick="batchDelete()">移到垃圾桶</button>
-          <button class="btn btn-secondary" onclick="toggleBatchMode()">結束批次</button>
+        <div class="batch-actionbar" id="batchActionBar">
+          <span id="batchActionText"></span>
+          <div class="batch-actions">
+            <button class="btn btn-secondary" onclick="batchSelectAll()">全選畫面上的</button>
+            <button class="btn btn-secondary" onclick="openExportModal()">匯出選取</button>
+            <button class="btn btn-danger" onclick="batchDelete()">移到垃圾桶</button>
+            <button class="btn btn-secondary" onclick="toggleBatchMode()">結束批次</button>
+          </div>
         </div>
-      </div>
 
-      <div class="wall-scroll" id="wallScroll">
-        <div class="card-wall" id="cardWall"></div>
-      </div>
-    </section>
-
-    <!-- ========== 檢視二：編輯一張卡 ========== -->
-    <section class="view view-edit" id="viewEdit">
-      <header class="top-bar">
-        <div class="top-left">
-          <button class="icon-btn" title="回到卡片牆" onclick="exitEditor()">←</button>
-          <h1 class="editor-title" id="editorTitle">新角色卡</h1>
-          <span class="save-mark" id="editorSaveMark">已儲存</span>
+        <div class="wall-scroll" id="wallScroll">
+          <div class="card-wall" id="cardWall"></div>
         </div>
-        <div class="top-right">
-          <button class="icon-btn" title="複製成另一張卡" onclick="duplicateEditingCard()">⧉</button>
-          <button class="icon-btn danger" title="移到垃圾桶" onclick="deleteEditingCard()">🗑️</button>
-          <button class="btn btn-primary" onclick="exitEditor()">完成</button>
+      </section>
+
+      <!-- ========== 檢視二：角色卡（即時存檔的編輯器） ========== -->
+      <section class="view-panel" id="viewCard">
+        <div class="editor-meta-panel" id="editorMetaPanel">
+          <div class="meta-top-row">
+            <button type="button" class="editor-avatar" id="editorAvatar" title="換一個符號" onclick="openIconPickerForCard()"></button>
+
+            <div class="meta-main">
+              <input type="text" id="fieldName" class="card-title-input" placeholder="她／他叫什麼？"
+                     oninput="editorSetName(this.value)" autocomplete="off">
+              <div class="meta-sub-row">
+                <input type="text" id="fieldAlias" class="alias-input" placeholder="別名／稱號"
+                       oninput="editorSetAlias(this.value)" autocomplete="off">
+                <span class="stat-pill" id="editorMeterText"></span>
+                <span class="save-mark" id="editorSaveMark">已儲存</span>
+              </div>
+              <div class="meter"><span id="editorMeterBar"></span></div>
+            </div>
+
+            <div class="meta-right-col">
+              <button class="action-pill-btn" onclick="previewEditingCard()" title="預覽這張卡">👁️<span class="lbl">預覽</span></button>
+              <button class="action-pill-btn" onclick="duplicateEditingCard()" title="複製成另一張卡">⧉<span class="lbl">複製</span></button>
+              <button class="action-pill-btn danger" onclick="deleteEditingCard()" title="移到垃圾桶">🗑️<span class="lbl">刪除</span></button>
+            </div>
+          </div>
         </div>
-      </header>
 
-      <div class="edit-scroll" id="editScroll">
-        <div class="edit-inner">
+        <div class="editor-content-area" id="editScroll">
+          <div class="edit-inner">
 
-          <div class="edit-identity">
-            <div class="avatar-col">
-              <button type="button" class="editor-avatar" id="editorAvatar" title="換一個符號" onclick="openIconPickerForCard()"></button>
+            <div class="edit-block">
+              <div class="block-head">
+                <h2>頭像與分類</h2>
+                <span class="block-hint" id="editorColorName"></span>
+              </div>
               <div class="avatar-btns">
                 <button type="button" class="mini-btn" onclick="triggerAvatarPick()">上傳圖片</button>
                 <button type="button" class="mini-btn" onclick="openIconPickerForCard()">選符號</button>
                 <button type="button" class="mini-btn danger" id="avatarRemoveBtn" onclick="removeAvatar()" style="display:none;">移除圖片</button>
               </div>
               <input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="handleAvatarFile(event)">
+              <div class="palette-row-wrap" id="editorColorRow"></div>
+              <label class="field-label" for="editorGroupSelect">收在哪個作品裡</label>
+              <select id="editorGroupSelect" class="text-input" onchange="editorChangeGroup(this.value)"></select>
             </div>
 
-            <div class="identity-col">
-              <label class="field-label" for="fieldName">角色名稱</label>
-              <input type="text" id="fieldName" class="text-input big" placeholder="她／他叫什麼？"
-                     oninput="editorSetName(this.value)" autocomplete="off">
-
-              <label class="field-label" for="fieldAlias">別名／稱號</label>
-              <input type="text" id="fieldAlias" class="text-input" placeholder="外號、代號、別人怎麼叫他"
-                     oninput="editorSetAlias(this.value)" autocomplete="off">
-
-              <label class="field-label" for="fieldTagline">一句話簡介</label>
-              <textarea id="fieldTagline" class="text-input" rows="2"
-                        placeholder="如果只能用一句話介紹這個角色，你會怎麼說？"
-                        oninput="editorSetTagline(this.value)"></textarea>
-
-              <div class="meter-row">
-                <div class="meter"><span id="editorMeterBar"></span></div>
-                <span class="meter-text" id="editorMeterText"></span>
+            <div class="edit-block">
+              <div class="block-head">
+                <h2>一句話簡介</h2>
+                <span class="block-hint">如果只能用一句話介紹這個角色，你會怎麼說？</span>
               </div>
+              <textarea id="fieldTagline" class="text-input" rows="2"
+                        placeholder="卡片牆上顯示的就是這一句。"
+                        oninput="editorSetTagline(this.value)"></textarea>
             </div>
-          </div>
 
-          <div class="edit-block">
-            <div class="block-head">
-              <h2>分類與作品</h2>
-              <span class="block-hint" id="editorColorName"></span>
+            <div class="edit-block">
+              <div class="block-head">
+                <h2>資料列</h2>
+                <span class="block-hint">短短一行的東西（性別、年齡、身高…），欄位名稱可以自己改</span>
+              </div>
+              <div id="editorFieldList"></div>
+              <button type="button" class="add-row-btn" id="addFieldBtn" onclick="addEditorField()">＋ 加一列</button>
             </div>
-            <div class="palette-row-wrap" id="editorColorRow"></div>
-            <label class="field-label" for="editorGroupSelect">收在哪個作品裡</label>
-            <select id="editorGroupSelect" class="text-input" onchange="editorChangeGroup(this.value)"></select>
-          </div>
 
-          <div class="edit-block">
-            <div class="block-head">
-              <h2>資料列</h2>
-              <span class="block-hint">短短一行的東西（性別、年齡、身高…），欄位名稱可以自己改</span>
+            <div class="edit-block">
+              <div class="block-head">
+                <h2>設定段落</h2>
+                <span class="block-hint">大段的文字（外觀、性格、背景、關係…），順序可以調</span>
+              </div>
+              <div id="editorSectionList"></div>
+              <button type="button" class="add-row-btn" id="addSectionBtn" onclick="addEditorSection()">＋ 加一個段落</button>
             </div>
-            <div id="editorFieldList"></div>
-            <button type="button" class="add-row-btn" id="addFieldBtn" onclick="addEditorField()">＋ 加一列</button>
-          </div>
 
-          <div class="edit-block">
-            <div class="block-head">
-              <h2>設定段落</h2>
-              <span class="block-hint">大段的文字（外觀、性格、背景、關係…），順序可以調</span>
+            <div class="edit-block">
+              <div class="block-head">
+                <h2>標籤</h2>
+                <span class="block-hint">用逗號或空白分隔，離開輸入框就會整理好</span>
+              </div>
+              <input type="text" id="fieldTags" class="text-input" placeholder="騎士、主角群、劍"
+                     onblur="editorCommitTags()" autocomplete="off">
+              <div class="suggest-row" id="tagSuggestRow"></div>
             </div>
-            <div id="editorSectionList"></div>
-            <button type="button" class="add-row-btn" id="addSectionBtn" onclick="addEditorSection()">＋ 加一個段落</button>
-          </div>
 
-          <div class="edit-block">
-            <div class="block-head">
-              <h2>標籤</h2>
-              <span class="block-hint">用逗號或空白分隔，離開輸入框就會整理好</span>
-            </div>
-            <input type="text" id="fieldTags" class="text-input" placeholder="騎士、主角群、劍"
-                   onblur="editorCommitTags()" autocomplete="off">
-            <div class="suggest-row" id="tagSuggestRow"></div>
           </div>
-
         </div>
-      </div>
-    </section>
 
+        <!-- 還沒選任何角色時蓋在上面 -->
+        <div class="editor-empty" id="editorEmpty">
+          <div class="empty-icon">📇</div>
+          <p class="empty-title">還沒選角色</p>
+          <p class="empty-hint">從左邊的清單點一個，或是從卡片牆點一張卡。</p>
+          <button class="btn btn-primary" onclick="createCard()">＋ 新增角色卡</button>
+        </div>
+      </section>
+
+    </main>
   </div>
 
-  <!-- ========== 卡片詳情 ========== -->
+  <!-- ========== 卡片詳情（展示用的預覽） ========== -->
   <div class="modal-overlay" id="cardDetailModal">
     <div class="modal-card wide">
       <div id="cardDetailBody"></div>

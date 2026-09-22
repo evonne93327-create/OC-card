@@ -85,3 +85,30 @@ test("index.html 的主題極短版與 theme.js 用同一個 key", function() {
   assert.ok(html.indexOf('localStorage.getItem("' + keyInJs[1] + '")') >= 0,
     "index.html <head> 裡的防閃爍腳本用了不一樣的 key，夜間模式開場會閃一下白畫面");
 });
+
+/* style.css 用到的每個 CSS 變數，ui-tokens.css 都要定義得出來。
+
+   這條是踩過坑才加的：style.css 寫了 `padding: var(--sp-7) var(--sp-12)`，
+   但 token 檔裡沒有 --sp-7。CSS 的行為是「整條宣告作廢」，不是「那一個
+   值當成 0」——結果是按鈕連 padding 都沒有，高度只剩文字的 19px。
+
+   這種錯不會有任何錯誤訊息，畫面也還畫得出來，只是變醜，所以很容易
+   一路帶上線。 */
+test("style.css 裡的 CSS 變數都在 ui-tokens.css 有定義", function() {
+  const tokensCss = fs.readFileSync(path.join(ROOT, "ui-tokens.css"), "utf8");
+  const styleCss = fs.readFileSync(path.join(ROOT, "style.css"), "utf8");
+
+  const defined = new Set();
+  const defRe = /^\s*(--[a-z0-9-]+)\s*:/gim;
+  let m;
+  while ((m = defRe.exec(tokensCss)) !== null) defined.add(m[1]);
+
+  const missing = new Set();
+  const useRe = /var\((--[a-z0-9-]+)/g;
+  while ((m = useRe.exec(styleCss)) !== null) {
+    if (!defined.has(m[1])) missing.add(m[1]);
+  }
+
+  assert.deepStrictEqual(Array.from(missing), [],
+    "這些變數沒有定義，用到它們的那整條 CSS 宣告會被瀏覽器丟掉");
+});

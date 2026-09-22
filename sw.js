@@ -14,7 +14,7 @@
    這份清單跟 index.html 實際載入的檔案對不對得上。
    ========================================================== */
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = 'oc-card-' + VERSION;
 
 // 離線時要能完整開起來所需的檔案

@@ -202,7 +202,7 @@ function toast(msg) {
 }
 
 
-/* ---------- 分組（作品）側欄 ---------- */
+/* ---------- 作品直欄（手機版是置底橫列） ---------- */
 
 function renderGroupRail() {
   const box = el("groupRailList");
@@ -211,12 +211,13 @@ function renderGroupRail() {
 
   appData.groups.forEach(function(g) {
     const btn = document.createElement("button");
-    btn.className = "rail-btn" + (g.id === activeGroupId ? " active" : "");
+    btn.className = "world-rail-btn" + (g.id === activeGroupId ? " active" : "");
     btn.title = g.name + "（" + cardsInGroup(g.id).length + " 張）";
     btn.textContent = g.icon || "📁";
     btn.onclick = function() { switchGroup(g.id); };
-    // 長按／右鍵改名或刪除。跟世界觀工作台的作法一致：
-    // 「顯示」與「設定」分開，免得點一下就誤觸設定
+
+    /* 長按／右鍵才是「改名與換圖示」。跟 world_2 一致：顯示與設定分開，
+       免得點一下就誤觸設定——在手機上那顆按鈕是最常按到的東西。 */
     btn.oncontextmenu = function(e) { e.preventDefault(); openGroupModal(g.id); };
     let pressTimer = null;
     btn.addEventListener("touchstart", function() {
@@ -242,10 +243,15 @@ function switchGroup(id) {
   filterTag = null;
   filterColor = null;
   saveUIState();
-  closeRailMobile();
+
+  /* 換作品時把編輯器放掉並回到卡片牆：正在編輯的那張卡屬於上一個作品，
+     留著它會變成「作品顯示 A、編輯器顯示 B 的角色」。切換前先補存。 */
+  flushEditorDraft();
+  editingCardId = null;
+
   renderGroupRail();
-  renderWall();
   updateGroupBadge();
+  switchView("wall");
 }
 
 function updateGroupBadge() {
@@ -255,36 +261,68 @@ function updateGroupBadge() {
 }
 
 
-/* ---------- 手機版的作品抽屜 ---------- */
+/* ---------- 角色清單側欄的開合 ----------
 
-function openRailMobile() {
-  document.body.classList.add("rail-open");
+   同一顆 ☰ 在兩種版面做兩件事，跟 world_2 一樣：
+     電腦版：把清單整個收起來（.collapsed），讓卡片牆吃滿寬度
+     手機版：清單是蓋在上面的抽屜（.drawer-open + 遮罩）
+
+   判斷條件要跟 CSS 的斷點完全一致（寬度窄「或」高度矮），
+   不然會出現「CSS 認為是手機、JS 認為是電腦」的錯位。 */
+
+function isMobileLayout() {
+  return !!(window.matchMedia &&
+    window.matchMedia("(max-width: 768px), (max-height: 500px)").matches);
 }
 
-function closeRailMobile() {
-  document.body.classList.remove("rail-open");
+function toggleSidebarMenu() {
+  const sidebar = el("appSidebar");
+  if (!sidebar) return;
+  if (isMobileLayout()) {
+    const open = sidebar.classList.toggle("drawer-open");
+    const overlay = el("sidebarOverlay");
+    if (overlay) overlay.classList.toggle("active", open);
+  } else {
+    sidebar.classList.toggle("collapsed");
+  }
 }
 
-function toggleRailMobile() {
-  document.body.classList.toggle("rail-open");
+function closeSidebarMobile() {
+  const sidebar = el("appSidebar");
+  if (sidebar) sidebar.classList.remove("drawer-open");
+  const overlay = el("sidebarOverlay");
+  if (overlay) overlay.classList.remove("active");
+}
+
+function sidebarDrawerOpen() {
+  const sidebar = el("appSidebar");
+  return !!sidebar && sidebar.classList.contains("drawer-open");
 }
 
 
-/* ---------- 版面切換 ---------- */
+/* ---------- 檢視切換 ----------
 
-/* 卡片牆與編輯面板是兩個檢視，不是兩個彈窗。
+   兩個檢視：卡片牆（總覽）與角色卡（即時存檔的編輯器）。
+   跟 world_2 的「文檔／白板」同一個做法：兩個都留在 DOM 裡，由
+   body 的 data-view 決定誰在前面，切回來時捲動位置不會重來。 */
 
-   編輯一張卡要填十幾個欄位，用彈窗的話手機上永遠只看得到三行，而且
-   鍵盤一彈出來就把視窗推到看不見。做成整頁檢視，回上一頁就回到牆上。 */
 function switchView(view) {
-  activeView = view === "edit" ? "edit" : "wall";
+  activeView = view === "card" ? "card" : "wall";
   document.body.setAttribute("data-view", activeView);
+
+  const wallTab = el("tabWallBtn");
+  const cardTab = el("tabCardBtn");
+  if (wallTab) wallTab.classList.toggle("active", activeView === "wall");
+  if (cardTab) cardTab.classList.toggle("active", activeView === "card");
+
+  // 沒有選角色就把編輯器蓋住，不要讓人對著一張空表單發呆
+  document.body.classList.toggle("no-card-open", activeView === "card" && !editingCardId);
+
   if (activeView === "wall") {
     renderWall();
+    const s = el("wallScroll");
+    if (s) s.scrollTop = wallScrollMemo || 0;
   }
-  window.scrollTo(0, 0);
-  const scroller = el(activeView === "wall" ? "wallScroll" : "editScroll");
-  if (scroller) scroller.scrollTop = activeView === "wall" ? (wallScrollMemo || 0) : 0;
 }
 
 /* 從卡片牆進編輯器之前記下捲動位置，改完回來才不會跳回最頂端——
@@ -304,12 +342,12 @@ function setupGlobalKeyboardShortcuts() {
     const inField = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "") ||
                     (e.target && e.target.isContentEditable);
 
-    // Esc：由外而內關掉一層。彈窗 → 詳情 → 編輯器
+    // Esc：由外而內關掉一層。彈窗 → 抽屜 → 回卡片牆 → 清搜尋
     if (e.key === "Escape") {
       const openModal = document.querySelector(".modal-overlay.active");
       if (openModal) { closeModalEl(openModal); return; }
-      if (document.body.classList.contains("rail-open")) { closeRailMobile(); return; }
-      if (activeView === "edit") { exitEditor(); return; }
+      if (sidebarDrawerOpen()) { closeSidebarMobile(); return; }
+      if (activeView === "card") { switchView("wall"); return; }
       if (searchQuery) { clearSearch(); return; }
       return;
     }
@@ -319,7 +357,8 @@ function setupGlobalKeyboardShortcuts() {
       // 而寫東西的人手指會自己按下去
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        if (activeView === "edit") { flushEditorDraft(); toast("已儲存"); }
+        flushEditorDraft();
+        toast("已儲存");
       }
       return;
     }
@@ -333,7 +372,8 @@ function setupGlobalKeyboardShortcuts() {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     if (e.key === "/") { e.preventDefault(); focusSearch(); return; }
-    if (e.key.toLowerCase() === "n" && activeView === "wall") { e.preventDefault(); createCard(); return; }
+    if (e.key.toLowerCase() === "n") { e.preventDefault(); createCard(); return; }
+    if (e.key.toLowerCase() === "b") { e.preventDefault(); toggleSidebarMenu(); return; }
   });
 }
 
@@ -342,8 +382,6 @@ function setupGlobalKeyboardShortcuts() {
    真正拿掉 active 的動作集中在這裡一份。 */
 function closeModalEl(modal) {
   if (!modal) return;
-  const id = modal.id;
-  // 有自訂收尾的就走它的，其餘直接關
   const custom = {
     "cardDetailModal": closeCardDetail,
     "groupModal": closeGroupModal,
@@ -354,7 +392,7 @@ function closeModalEl(modal) {
     "appearanceModal": closeAppearanceModal,
     "iconPickerModal": closeIconPicker
   };
-  if (typeof custom[id] === "function") { custom[id](); return; }
+  if (typeof custom[modal.id] === "function") { custom[modal.id](); return; }
   modal.classList.remove("active");
 }
 
@@ -370,5 +408,20 @@ function setupModalBackdropClose() {
       };
       overlay.addEventListener("mouseup", onUp);
     });
+  });
+}
+
+/* 視窗尺寸跨過手機／電腦的斷點時，把上一種版面留下的 class 清掉。
+   不清的話：在手機版開著抽屜、轉成橫向變電腦版，那個 .drawer-open
+   會讓清單欄用 fixed 定位卡在畫面上，蓋住半個卡片牆。 */
+function setupLayoutWatch() {
+  let wasMobile = isMobileLayout();
+  window.addEventListener("resize", function() {
+    const now = isMobileLayout();
+    if (now === wasMobile) return;
+    wasMobile = now;
+    closeSidebarMobile();
+    const sidebar = el("appSidebar");
+    if (sidebar && now) sidebar.classList.remove("collapsed");
   });
 }
