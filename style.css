@@ -9,6 +9,13 @@
    這個檔案裡不應該出現寫死的色碼。
    ========================================================== */
 
+:root {
+  /* 這份 CSS 是哪一版。js/app.js 會把它跟 APP_BUILD 比對——對不上就代表
+     瀏覽器拿到的 HTML 與 CSS 不是同一版（快取錯配），版面一定是散的。
+     必須跟 sw.js 的 VERSION 一致，tests/shell-manifest.test.js 會檢查。 */
+  --css-build: "5";
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

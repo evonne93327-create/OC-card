@@ -137,7 +137,7 @@ test("style.css 裡的 CSS 變數都在 ui-tokens.css 有定義", function() {
 
    只要 css/js 的網址帶著版本戳，版本一跳就是一個全新的網址，任何快取裡
    都沒有，這種半新半舊就不可能組得出來——前提是三個地方的版本一致。 */
-test("版本戳：sw.js、index.html、state.js 三邊一致", function() {
+test("版本戳：sw.js、index.html、state.js、style.css 四邊一致", function() {
   const version = swVersion();
 
   const stateJs = fs.readFileSync(path.join(ROOT, "js", "state.js"), "utf8");
@@ -145,6 +145,12 @@ test("版本戳：sw.js、index.html、state.js 三邊一致", function() {
   assert.ok(build, "state.js 裡找不到 APP_BUILD");
   assert.strictEqual(build[1], version,
     "state.js 的 APP_BUILD 跟 sw.js 的 VERSION 不一樣，設定裡顯示的版本會是錯的");
+
+  const styleCss = fs.readFileSync(path.join(ROOT, "style.css"), "utf8");
+  const cssBuild = styleCss.match(/--css-build:\s*"([^"]+)"/);
+  assert.ok(cssBuild, "style.css 的 :root 裡找不到 --css-build");
+  assert.strictEqual(cssBuild[1], version,
+    "style.css 的 --css-build 跟 sw.js 的 VERSION 不一樣，開機健檢會誤判成快取錯配並一直想自救");
 
   const stamped = assetsInHtml().filter(function(a) { return /\.(css|js)(\?|$)/.test(a); });
   assert.ok(stamped.length >= 10, "index.html 裡找不到預期數量的 css/js");

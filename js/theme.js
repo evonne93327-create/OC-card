@@ -182,8 +182,11 @@ function renderSettingsRows() {
 
    卡片資料在 localStorage，完全不碰——這件事一定要在確認視窗裡講明白，
    不然沒有人敢按下去。 */
-function forceRefreshApp() {
-  if (!confirm("清掉這個 app 的程式快取並重新載入？\n\n" +
+function forceRefreshApp(opts) {
+  /* silent 是開機健檢自動呼叫的路徑（見 js/app.js）：那時版面已經是壞的，
+     再跳一個確認視窗只會讓人更慌，而且那個視窗本身可能也是壞的。 */
+  const silent = !!(opts && opts.silent);
+  if (!silent && !confirm("清掉這個 app 的程式快取並重新載入？\n\n" +
                "你的角色卡存在瀏覽器本機，不會被清掉，也不需要重新匯入。\n" +
                "這個動作只是把畫面與程式碼換成伺服器上最新的那一份。")) return;
 

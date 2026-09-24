@@ -13,7 +13,7 @@
 
 | | |
 |---|---|
-| service worker | **v4** |
+| service worker | **v5** |
 | 開發分支 | `claude/oc-character-card-archive-tqvgd6` |
 | 測試 | `node --test`，25 項全綠 |
 | 雲端同步 | 還沒做（見下方〈還沒做的事〉） |
@@ -70,11 +70,20 @@ HTTP 快取就可能回舊的那一份。而新 HTML 的 class 名稱在舊 CSS 
 
 | 檔案 | 位置 |
 |---|---|
-| `sw.js` | `const VERSION = '3'`（SHELL 會自動接上 `STAMP`） |
-| `index.html` | 每個 `<link>` 與 `<script>` 的 `?v=3` |
-| `js/state.js` | `const APP_BUILD = "3"`（設定裡顯示的版本） |
+| `sw.js` | `const VERSION = '5'`（SHELL 會自動接上 `STAMP`） |
+| `index.html` | 每個 `<link>` 與 `<script>` 的 `?v=5` |
+| `js/state.js` | `const APP_BUILD = "5"`（設定裡顯示的版本） |
+| `style.css` | `:root { --css-build: "5" }`（開機健檢用） |
 
-`tests/shell-manifest.test.js` 會把三邊對一次，漏掉哪個都會紅。
+`tests/shell-manifest.test.js` 會把四邊對一次，漏掉哪個都會紅。
+
+**開機健檢**（`verifyAssetVersions()`，js/app.js）：CSS 自己在 `:root` 宣告
+`--css-build`，JS 拿它跟 `APP_BUILD` 比。對不上（或根本讀不到，代表 CSS
+沒載進來）就自動清快取重載一次；用 sessionStorage 當旗標只救一次，避免
+「壞掉 → 重載 → 還是壞 → 重載」的無限迴圈。救不回來就顯示一條紅色提示。
+
+那條提示刻意用 inline style 寫死、不吃任何 class——會走到那裡就表示 CSS
+本身有問題，用 class 做的提示很可能也是壞的或根本看不見。
 
 另外設定裡有一顆**強制更新**（`forceRefreshApp()`）：丟掉 service worker
 與所有快取，再用帶時間戳的網址重新載入。它是自救按鈕——使用者遇到快取
