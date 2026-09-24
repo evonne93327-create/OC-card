@@ -162,6 +162,49 @@ function renderSettingsRows() {
 
   const c = el("statsRowValue");
   if (c) c.textContent = appData.cards.length + " 張卡片 ・ " + appData.groups.length + " 個作品";
+
+  const b = el("buildRowValue");
+  if (b) b.textContent = "v" + APP_BUILD;
+}
+
+/* 強制更新：把 service worker 與它的快取全部丟掉再重新載入。
+
+   這是「自救按鈕」。網路優先的策略已經讓人很難被鎖在舊版，但快取這種
+   東西總有想不到的壞法（瀏覽器自己的 HTTP 快取、裝成 app 之後的
+   啟動畫面、同步到一半斷線…），而使用者遇到時只會看到「版面跑掉了」，
+   不會知道那是快取問題，更不會知道怎麼救。
+
+   卡片資料在 localStorage，完全不碰——這件事一定要在確認視窗裡講明白，
+   不然沒有人敢按下去。 */
+function forceRefreshApp() {
+  if (!confirm("清掉這個 app 的程式快取並重新載入？\n\n" +
+               "你的角色卡存在瀏覽器本機，不會被清掉，也不需要重新匯入。\n" +
+               "這個動作只是把畫面與程式碼換成伺服器上最新的那一份。")) return;
+
+  const done = function() {
+    /* 網址加一個時間戳再重新載入：光是 reload() 有可能還是吃到瀏覽器
+       自己的 HTTP 快取，那就白清了。 */
+    location.replace(location.pathname + "?r=" + Date.now());
+  };
+
+  const jobs = [];
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function(regs) {
+        return Promise.all(regs.map(function(r) { return r.unregister(); }));
+      }));
+    }
+    if (window.caches && caches.keys) {
+      jobs.push(caches.keys().then(function(keys) {
+        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+      }));
+    }
+  } catch (e) {
+    console.error("清快取失敗：", e);
+  }
+
+  // 清不掉也要重新載入——帶時間戳的網址本身就已經繞過大部分快取了
+  Promise.all(jobs).then(done).catch(function(e) { console.error(e); done(); });
 }
 
 function openAppearanceModal() {

@@ -13,9 +13,9 @@
 
 | | |
 |---|---|
-| service worker | **v2** |
+| service worker | **v3** |
 | 開發分支 | `claude/oc-character-card-archive-tqvgd6` |
-| 測試 | `node --test`，24 項全綠 |
+| 測試 | `node --test`，25 項全綠 |
 | 雲端同步 | 還沒做（見下方〈還沒做的事〉） |
 
 ---
@@ -57,7 +57,31 @@
   不加的話舊快取不會被清掉。`tests/shell-manifest.test.js` 會檢查 SHELL
   清單跟 index.html 對不對得上，但它檢查不到「你忘記加版號」。
 
-### 4. 版面骨架是照 world_2 抄的，不要自己另創一套
+### 4. css/js 的網址一定要帶 `?v=<版本>`，三個地方的版本要一致
+
+出過事：手機上版面整個散掉。原因是拿到了**新的 `index.html` 配舊的
+`style.css`**——網路優先只保證「每個檔案各自是新的」，不保證「這一批是
+同一版」。GitHub Pages 給 css 的 `max-age=600`，十分鐘內瀏覽器自己的
+HTTP 快取就可能回舊的那一份。而新 HTML 的 class 名稱在舊 CSS 裡一條都
+不存在，結果看起來像程式壞了，不像快取問題。
+
+帶上版本戳之後這件事從結構上不可能發生：版本一跳，css/js 就是一個任何
+快取裡都沒有的新網址。要改的是**三個地方，缺一不可**：
+
+| 檔案 | 位置 |
+|---|---|
+| `sw.js` | `const VERSION = '3'`（SHELL 會自動接上 `STAMP`） |
+| `index.html` | 每個 `<link>` 與 `<script>` 的 `?v=3` |
+| `js/state.js` | `const APP_BUILD = "3"`（設定裡顯示的版本） |
+
+`tests/shell-manifest.test.js` 會把三邊對一次，漏掉哪個都會紅。
+
+另外設定裡有一顆**強制更新**（`forceRefreshApp()`）：丟掉 service worker
+與所有快取，再用帶時間戳的網址重新載入。它是自救按鈕——使用者遇到快取
+問題時只會看到「版面跑掉了」，不會知道要怎麼救。它不碰 localStorage，
+確認視窗裡一定要講明白，不然沒有人敢按。
+
+### 5. 版面骨架是照 world_2 抄的，不要自己另創一套
 
 三欄：作品直欄 62px ＋ 角色清單側欄 280px ＋ 主區（頂欄 54px + 內容）。
 手機版（`max-width: 768px` **或** `max-height: 500px`）作品欄變成置底橫列、
@@ -69,7 +93,7 @@
 幾乎沒有地方可以看卡片。`isMobileLayout()`（js/main.js）的判斷式必須
 跟 CSS 的斷點逐字一致，否則會出現「CSS 認為是手機、JS 認為是電腦」的錯位。
 
-### 5. 用到的 CSS 變數一定要在 ui-tokens.css 定義得出來
+### 6. 用到的 CSS 變數一定要在 ui-tokens.css 定義得出來
 
 `style.css` 寫了 `padding: var(--sp-7) var(--sp-12)`，但 token 檔裡沒有
 `--sp-7`。CSS 的行為是**整條宣告作廢**，不是「那一個值當成 0」——結果是
@@ -78,7 +102,7 @@
 沒有任何錯誤訊息，畫面也還畫得出來，只是變醜，所以很容易一路帶上線。
 `tests/shell-manifest.test.js` 現在會把兩邊對一次。
 
-### 6. `<script>` 的載入順序有相依性
+### 7. `<script>` 的載入順序有相依性
 
 `js/main.js` 必須排在 `js/storage.js` 前面：storage.js 在載入時就會跑
 `ensureCardShape()`，而它用到的 `isSafeImageSrc`／`dedupeTags`／`formatTime`
@@ -87,7 +111,7 @@
 `tests/shell-manifest.test.js` 有釘住這件事，`tests/helpers/load-app.js`
 也照同一個順序載入。
 
-### 7. 主題的唯一判斷來源是 `<html data-theme>`
+### 8. 主題的唯一判斷來源是 `<html data-theme>`
 
 卡片的色條、標籤底色、完成度量表是 JS 直接寫進 `style` 的，CSS 的
 `@media (prefers-color-scheme)` 管不到它們。所以主題解析一律走
@@ -97,7 +121,7 @@
 `index.html` 的 `<head>` 裡有一份極短版（避免開場閃白畫面），**它的 key
 必須跟 `theme.js` 的 `THEME_KEY` 一致**，測試有檢查。
 
-### 8. 刪除一律進垃圾桶
+### 9. 刪除一律進垃圾桶
 
 角色設定是累積很久的東西，誤刪的代價跟「刪一則便條」完全不同。
 垃圾桶保留 60 天（`TRASH_RETENTION_DAYS`），過期在載入時自動清掉。

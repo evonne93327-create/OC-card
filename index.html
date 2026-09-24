@@ -27,8 +27,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="ui-tokens.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="ui-tokens.css?v=3">
+  <link rel="stylesheet" href="style.css?v=3">
 
   <!-- 主題要在 CSS 生效前就定下來，否則夜間模式每次開啟都會先閃一下白畫面。
        這份是 js/theme.js 的極短版，邏輯必須跟那邊一致（key 也是）。 -->
@@ -378,11 +378,17 @@
         <button class="settings-row" onclick="settingsGoTo(openTrashModal)">
           <span>🗑️ 垃圾桶</span><span class="settings-value" id="trashRowValue"></span>
         </button>
+        <button class="settings-row" onclick="forceRefreshApp()">
+          <span>🔄 強制更新</span><span class="settings-value">清掉快取重新載入，卡片不受影響</span>
+        </button>
         <div class="settings-row is-static">
           <span>💾 本機用量</span><span class="settings-value" id="storageRowValue"></span>
         </div>
         <div class="settings-row is-static">
           <span>📊 目前收藏</span><span class="settings-value" id="statsRowValue"></span>
+        </div>
+        <div class="settings-row is-static">
+          <span>🏷️ 版本</span><span class="settings-value" id="buildRowValue"></span>
         </div>
       </div>
       <p class="modal-hint">資料存在這台裝置的瀏覽器裡，換裝置不會跟著走——重要的設定請定期匯出備份。</p>
@@ -464,18 +470,22 @@
   <input type="file" id="importFileInput" accept=".json,application/json" style="display:none;" onchange="handleImportFileSelected(event)">
   <div class="toast" id="toast"></div>
 
-  <!-- 載入順序有相依性：state.js 定義常數與 safeStorage*，main.js 的純函式
+  <!-- css 與 js 的網址都帶 ?v=<版本>，版本值必須跟 sw.js 的 VERSION 一致
+       （tests/shell-manifest.test.js 會檢查）。這是為了讓「新的 HTML 配到
+       舊的 CSS」這件事不可能發生——見 sw.js 開頭的說明。
+
+       載入順序有相依性：state.js 定義常數與 safeStorage*，main.js 的純函式
        （isSafeImageSrc、dedupeTags、formatTime）在 storage.js 載入時就會被
        呼叫到，所以 main.js 必須排在 storage.js 前面。改順序前請先看
        tests/shell-manifest.test.js。 -->
-  <script src="js/state.js"></script>
-  <script src="js/main.js"></script>
-  <script src="js/storage.js"></script>
-  <script src="js/cards.js"></script>
-  <script src="js/editor.js"></script>
-  <script src="js/modal.js"></script>
-  <script src="js/import-export.js"></script>
-  <script src="js/theme.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/state.js?v=3"></script>
+  <script src="js/main.js?v=3"></script>
+  <script src="js/storage.js?v=3"></script>
+  <script src="js/cards.js?v=3"></script>
+  <script src="js/editor.js?v=3"></script>
+  <script src="js/modal.js?v=3"></script>
+  <script src="js/import-export.js?v=3"></script>
+  <script src="js/theme.js?v=3"></script>
+  <script src="js/app.js?v=3"></script>
 </body>
 </html>
