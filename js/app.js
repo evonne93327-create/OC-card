@@ -6,25 +6,13 @@ window.addEventListener("DOMContentLoaded", function() {
   buildIconPicker();
   renderGroupRail();
   updateGroupBadge();
-  renderWall();
-  switchView("wall");
+  switchView("wall");          // 內含 renderWall()
   setupGlobalKeyboardShortcuts();
   setupModalBackdropClose();
-  setupRailOverlay();
+  setupLayoutWatch();
   initTheme();
   registerServiceWorker();
-
-  // 搜尋框的清空鈕預設藏著，有字才出現
-  const clear = el("searchClearBtn");
-  if (clear) clear.style.visibility = "hidden";
 });
-
-/* 手機版的作品抽屜：點旁邊的暗色區域要關掉。
-   沒有這個的話，抽屜開著時整個畫面都點不動，看起來像當掉。 */
-function setupRailOverlay() {
-  const overlay = el("railOverlay");
-  if (overlay) overlay.addEventListener("click", closeRailMobile);
-}
 
 
 /* ---------- Service worker ----------

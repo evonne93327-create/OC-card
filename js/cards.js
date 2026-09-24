@@ -37,7 +37,8 @@ function tagsInGroup(groupId) {
 /* ---------- 卡片牆 ---------- */
 
 function renderWall() {
-  renderFilterBar();
+  renderFilterUI();
+  renderCharList();
   updateGroupBadge();
 
   const wall = el("cardWall");
@@ -51,7 +52,7 @@ function renderWall() {
   if (countEl) {
     countEl.textContent = (list.length === total)
       ? total + " 張卡片"
-      : list.length + " / " + total + " 張卡片";
+      : list.length + " / " + total + " 張";
   }
 
   if (!list.length) {
@@ -63,6 +64,84 @@ function renderWall() {
   list.forEach(function(card) { wall.appendChild(buildCardEl(card)); });
   renderBatchBar();
 }
+
+
+/* ---------- 側欄的角色清單 ----------
+
+   跟卡片牆看的是同一份 visibleCards()，所以搜尋與篩選在兩邊一致——
+   側欄還列著卡片牆上沒有的角色，只會讓人以為畫面壞了。 */
+
+function renderCharList() {
+  const box = el("charList");
+  if (!box) return;
+  box.innerHTML = "";
+
+  const list = visibleCards();
+  if (!list.length) {
+    const empty = document.createElement("p");
+    empty.className = "list-empty";
+    empty.textContent = cardsInGroup(activeGroupId).length
+      ? "沒有符合條件的角色。" : "這個作品還沒有角色。";
+    box.appendChild(empty);
+    return;
+  }
+
+  list.forEach(function(card) {
+    const pal = getPalette(card.color);
+
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "node-row";
+    if (card.id === editingCardId && activeView === "card") row.classList.add("active");
+    if (isBatchMode && batchSelected.has(card.id)) row.classList.add("batch-checked");
+
+    const icon = document.createElement("span");
+    icon.className = "node-icon";
+    icon.style.background = pal.bg;
+    icon.style.color = pal.text;
+    if (card.avatar && isSafeImageSrc(card.avatar)) {
+      const img = document.createElement("img");
+      img.src = card.avatar;
+      img.alt = "";
+      img.loading = "lazy";
+      icon.appendChild(img);
+    } else {
+      icon.textContent = card.icon || nameInitial(card.name);
+    }
+    row.appendChild(icon);
+
+    const text = document.createElement("span");
+    text.className = "node-text";
+    const name = document.createElement("span");
+    name.className = "node-name";
+    name.textContent = card.name || "未命名角色";
+    text.appendChild(name);
+    // 副標優先顯示別名，沒有別名就顯示第一個標籤——兩者都沒有就不佔一行
+    const sub = card.alias || (card.tags || [])[0] || "";
+    if (sub) {
+      const subEl = document.createElement("span");
+      subEl.className = "node-sub";
+      subEl.textContent = card.alias ? sub : "#" + sub;
+      text.appendChild(subEl);
+    }
+    row.appendChild(text);
+
+    if (card.favorite) {
+      const star = document.createElement("span");
+      star.className = "node-star";
+      star.textContent = "★";
+      row.appendChild(star);
+    }
+
+    row.onclick = function() {
+      if (isBatchMode) { toggleBatchSelect(card.id); return; }
+      openEditor(card.id);
+      closeSidebarMobile();
+    };
+    box.appendChild(row);
+  });
+}
+
 
 /* 空畫面要講清楚「為什麼是空的」。
 
@@ -229,29 +308,27 @@ function buildCardEl(card) {
 
 /* ---------- 篩選列 ---------- */
 
-function renderFilterBar() {
+function renderFilterUI() {
+  // 標籤篩選
   const box = el("tagFilterRow");
   if (box) {
     box.innerHTML = "";
     const tags = tagsInGroup(activeGroupId);
-    if (!tags.length) {
-      box.classList.add("is-empty");
-    } else {
-      box.classList.remove("is-empty");
-      tags.forEach(function(t) {
-        const chip = document.createElement("button");
-        chip.className = "filter-chip" + (filterTag === t.tag ? " on" : "");
-        chip.textContent = "#" + t.tag;
-        const n = document.createElement("span");
-        n.className = "filter-count";
-        n.textContent = t.count;
-        chip.appendChild(n);
-        chip.onclick = function() { setTagFilter(filterTag === t.tag ? null : t.tag); };
-        box.appendChild(chip);
-      });
-    }
+    box.classList.toggle("is-empty", !tags.length);
+    tags.forEach(function(t) {
+      const chip = document.createElement("button");
+      chip.className = "filter-chip" + (filterTag === t.tag ? " on" : "");
+      chip.textContent = "#" + t.tag;
+      const n = document.createElement("span");
+      n.className = "filter-count";
+      n.textContent = t.count;
+      chip.appendChild(n);
+      chip.onclick = function() { setTagFilter(filterTag === t.tag ? null : t.tag); };
+      box.appendChild(chip);
+    });
   }
 
+  // 分類顏色
   const colorBox = el("colorFilterRow");
   if (colorBox) {
     colorBox.innerHTML = "";
@@ -273,14 +350,44 @@ function renderFilterBar() {
     favBtn.setAttribute("aria-pressed", filterFavorite ? "true" : "false");
   }
 
-  const clearBtn = el("clearFilterBtn");
-  if (clearBtn) {
-    const any = !!(filterTag || filterColor || filterFavorite || searchQuery);
-    clearBtn.style.display = any ? "inline-flex" : "none";
-  }
-
   const sortBtn = el("sortSelect");
   if (sortBtn && sortBtn.value !== sortMode) sortBtn.value = sortMode;
+
+  renderWallActiveFilters();
+}
+
+/* 卡片牆上方的「目前條件」。
+
+   篩選面板是收起來的，所以一定要有個地方講「你現在只看得到一部分」，
+   否則使用者換了作品或關掉分頁再回來，會以為卡片不見了。
+   每個條件自己就是一顆可以按掉的 chip。 */
+function renderWallActiveFilters() {
+  const box = el("wallActiveFilters");
+  if (!box) return;
+  box.innerHTML = "";
+
+  const add = function(label, onClear) {
+    const chip = document.createElement("button");
+    chip.className = "filter-chip on";
+    chip.textContent = label + " ✕";
+    chip.title = "取消這個條件";
+    chip.onclick = onClear;
+    box.appendChild(chip);
+  };
+
+  if (searchQuery) add("搜尋「" + searchQuery + "」", clearSearch);
+  if (filterColor) add(getPalette(filterColor).name, function() { setColorFilter(null); });
+  if (filterTag) add("#" + filterTag, function() { setTagFilter(null); });
+  if (filterFavorite) add("★ 我的最愛", toggleFavFilter);
+
+  // 篩選按鈕上也要看得出「有條件開著」，不然面板收起來就沒有線索了
+  const toggleBtn = el("filterToggleBtn");
+  if (toggleBtn) toggleBtn.classList.toggle("active", !!(filterColor || filterTag || filterFavorite));
+}
+
+function toggleFilterPanel() {
+  const panel = el("filterPanel");
+  if (panel) panel.classList.toggle("open");
 }
 
 function setTagFilter(tag) {
@@ -305,13 +412,15 @@ function clearAllFilters() {
   searchQuery = "";
   const input = el("searchInput");
   if (input) input.value = "";
+  const clear = el("searchClearBtn");
+  if (clear) clear.classList.remove("show");
   renderWall();
 }
 
 function handleSearchInput(input) {
   searchQuery = input.value;
   const clear = el("searchClearBtn");
-  if (clear) clear.style.visibility = searchQuery ? "visible" : "hidden";
+  if (clear) clear.classList.toggle("show", !!searchQuery);
   renderWall();
 }
 
@@ -320,7 +429,7 @@ function clearSearch() {
   if (input) { input.value = ""; input.focus(); }
   searchQuery = "";
   const clear = el("searchClearBtn");
-  if (clear) clear.style.visibility = "hidden";
+  if (clear) clear.classList.remove("show");
   renderWall();
 }
 
@@ -403,6 +512,18 @@ function deleteCard(id, opts) {
     deletedAt: formatTime(new Date()),
     deletedTs: Date.now()
   }));
+
+  /* 被刪掉的正好是編輯器開著的那張，就把編輯器放掉。
+     不放的話 editingCardId 會指向一張不存在的卡，之後每次 markEditorDirty()
+     都找不到東西可改——畫面上還打得動字，但什麼都沒存進去。 */
+  if (editingCardId === id) {
+    editingCardId = null;
+    editorDirty = false;
+    clearTimeout(editorAutosaveTimer);
+    editorAutosaveTimer = null;
+    if (activeView === "card") switchView("wall");
+    else document.body.classList.add("no-card-open");
+  }
   if (!silent) {
     saveData();
     closeCardDetail();
@@ -464,16 +585,25 @@ function toggleBatchSelect(id) {
   renderWall();
 }
 
+/* 批次模式有兩條列：側欄一條（清單也能選）、卡片牆上方一條（動作都在那）。
+   兩條的文字由同一個地方產生，免得一邊說 3 張、一邊說 4 張。 */
 function renderBatchBar() {
+  const text = batchSelected.size
+    ? "已選取 " + batchSelected.size + " 張"
+    : "批次模式：點卡片或清單來選取";
+
   const bar = el("batchBar");
-  if (!bar) return;
-  bar.classList.toggle("active", isBatchMode);
+  if (bar) bar.classList.toggle("active", isBatchMode);
   const txt = el("batchCountText");
-  if (txt) {
-    txt.textContent = batchSelected.size
-      ? "已選取 " + batchSelected.size + " 張"
-      : "批次模式：點卡片來選取";
-  }
+  if (txt) txt.textContent = text;
+
+  const actionBar = el("batchActionBar");
+  if (actionBar) actionBar.classList.toggle("active", isBatchMode);
+  const actionTxt = el("batchActionText");
+  if (actionTxt) actionTxt.textContent = text;
+
+  const toggleBtn = el("batchToggleBtn");
+  if (toggleBtn) toggleBtn.classList.toggle("active", isBatchMode);
 }
 
 function batchSelectAll() {

@@ -14,10 +14,13 @@ const EDITOR_SAVE_DELAY_MS = 600;
 function openEditor(id) {
   const card = findCard(id);
   if (!card) return;
-  rememberWallScroll();
+  // 換一張卡之前先把上一張還沒寫進去的補存，不然切太快會掉最後幾個字
+  flushEditorDraft();
+  if (activeView === "wall") rememberWallScroll();
   editingCardId = id;
   renderEditor();
-  switchView("edit");
+  switchView("card");
+  renderCharList();
   // 新卡片一開起來就把游標放在名字上：這時使用者腦子裡想的就是名字
   if (!card.name) {
     const input = el("fieldName");
@@ -25,10 +28,14 @@ function openEditor(id) {
   }
 }
 
-function exitEditor() {
+/* 預覽：開那張展示用的詳情卡。
+
+   編輯器是「一格一格填」的介面，看不出成品長什麼樣；預覽就是給這件事的。
+   先 flush 再開，不然剛打的最後一句話不會出現在預覽裡。 */
+function previewEditingCard() {
+  if (!editingCardId) return;
   flushEditorDraft();
-  editingCardId = null;
-  switchView("wall");
+  openCardDetail(editingCardId);
 }
 
 /* 把還沒寫進 localStorage 的修改補存。離開編輯器、切到背景、關分頁
@@ -56,6 +63,9 @@ function markEditorDirty() {
     saveData();
     renderEditorSavedMark("已儲存");
     renderEditorMeter();
+    // 側欄那一列的名字／別名要跟著改。放在存檔後而不是每個按鍵都重畫，
+    // 角色多的時候才不會每打一個字就重建整份清單
+    renderCharList();
   }, EDITOR_SAVE_DELAY_MS);
 }
 
@@ -82,7 +92,6 @@ function renderEditor() {
   const card = findCard(editingCardId);
   if (!card) return;
 
-  el("editorTitle").textContent = card.name || "新角色卡";
   el("fieldName").value = card.name || "";
   el("fieldAlias").value = card.alias || "";
   el("fieldTagline").value = card.tagline || "";
@@ -102,7 +111,6 @@ function editorSetName(v) {
   const card = findCard(editingCardId);
   if (!card) return;
   card.name = String(v).slice(0, MAX_NAME_LEN);
-  el("editorTitle").textContent = card.name || "新角色卡";
   markEditorDirty();
 }
 
@@ -501,9 +509,11 @@ function deleteEditingCard() {
   editingCardId = null;
   editorDirty = false;
   clearTimeout(editorAutosaveTimer);
+  editorAutosaveTimer = null;
   deleteCard(id, { silent: true });
   saveData();
   switchView("wall");
+  renderWall();
   toast("已移到垃圾桶");
 }
 
