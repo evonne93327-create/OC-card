@@ -16,22 +16,37 @@ const { ROOT } = require("./helpers/load-app.js");
 const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 const sw = fs.readFileSync(path.join(ROOT, "sw.js"), "utf8");
 
+/* index.html 載入的 css／js／圖示，含 ?v= 查詢字串（那是版本戳，見 sw.js）。 */
 function assetsInHtml() {
   const out = [];
-  const re = /(?:src|href)="((?:js|icons)\/[^"]+|[^":/]+\.(?:css|json))"/g;
+  const re = /(?:src|href)="((?:js|icons)\/[^"]+|[^":/]+\.(?:css|json)(?:\?[^"]*)?)"/g;
   let m;
   while ((m = re.exec(html)) !== null) out.push(m[1]);
   return out;
 }
 
+/* SHELL 裡的每一筆。清單寫成 './style.css' + STAMP 的形式，所以要把
+   STAMP 換回實際的字串才能跟 index.html 對照。 */
 function shellList() {
   const block = sw.match(/const SHELL = \[([\s\S]*?)\];/);
   assert.ok(block, "sw.js 裡找不到 SHELL 清單");
-  return block[1].split(",").map(function(s) {
-    const m = s.match(/'([^']+)'/);
-    return m ? m[1].replace(/^\.\//, "") : null;
+  const stamp = "?v=" + swVersion();
+  return block[1].split(",").map(function(line) {
+    const m = line.match(/'([^']+)'/);
+    if (!m) return null;
+    const path = m[1].replace(/^\.\//, "");
+    return /\+\s*STAMP/.test(line) ? path + stamp : path;
   }).filter(Boolean);
 }
+
+function swVersion() {
+  const m = sw.match(/const VERSION = '([^']+)'/);
+  assert.ok(m, "sw.js 裡找不到 VERSION");
+  return m[1];
+}
+
+/* 去掉版本戳，用來檢查檔案是不是真的存在於磁碟上。 */
+function stripStamp(p) { return p.replace(/\?.*$/, ""); }
 
 test("index.html 載入的每個檔案都在 sw.js 的 SHELL 裡", function() {
   const shell = shellList();
@@ -43,14 +58,15 @@ test("index.html 載入的每個檔案都在 sw.js 的 SHELL 裡", function() {
 
 test("SHELL 裡的每個檔案都真的存在", function() {
   shellList().forEach(function(rel) {
-    if (rel === "" || rel === "/") return;          // './' 是首頁本身
-    assert.ok(fs.existsSync(path.join(ROOT, rel)), "SHELL 裡的 " + rel + " 不存在");
+    const file = stripStamp(rel);
+    if (file === "" || file === "/") return;        // './' 是首頁本身
+    assert.ok(fs.existsSync(path.join(ROOT, file)), "SHELL 裡的 " + rel + " 不存在");
   });
 });
 
 test("js 的載入順序：main.js 必須排在 storage.js 前面", function() {
   const order = [];
-  const re = /<script src="(js\/[^"]+)"><\/script>/g;
+  const re = /<script src="(js\/[^"?]+)[^"]*"><\/script>/g;
   let m;
   while ((m = re.exec(html)) !== null) order.push(m[1]);
 
@@ -111,4 +127,35 @@ test("style.css 裡的 CSS 變數都在 ui-tokens.css 有定義", function() {
 
   assert.deepStrictEqual(Array.from(missing), [],
     "這些變數沒有定義，用到它們的那整條 CSS 宣告會被瀏覽器丟掉");
+});
+
+/* 版本戳三邊要對得上：sw.js 的 VERSION、index.html 的 ?v=、state.js 的 APP_BUILD。
+
+   這條擋的是一個真的發生過、而且很難從症狀看出原因的狀況：手機拿到新的
+   index.html，但 style.css 還在瀏覽器 HTTP 快取的有效期內而是舊的那一份。
+   新 HTML 的 class 在舊 CSS 裡一條都不存在，版面整個散掉，看起來像程式壞了。
+
+   只要 css/js 的網址帶著版本戳，版本一跳就是一個全新的網址，任何快取裡
+   都沒有，這種半新半舊就不可能組得出來——前提是三個地方的版本一致。 */
+test("版本戳：sw.js、index.html、state.js、style.css 四邊一致", function() {
+  const version = swVersion();
+
+  const stateJs = fs.readFileSync(path.join(ROOT, "js", "state.js"), "utf8");
+  const build = stateJs.match(/const APP_BUILD = "([^"]+)"/);
+  assert.ok(build, "state.js 裡找不到 APP_BUILD");
+  assert.strictEqual(build[1], version,
+    "state.js 的 APP_BUILD 跟 sw.js 的 VERSION 不一樣，設定裡顯示的版本會是錯的");
+
+  const styleCss = fs.readFileSync(path.join(ROOT, "style.css"), "utf8");
+  const cssBuild = styleCss.match(/--css-build:\s*"([^"]+)"/);
+  assert.ok(cssBuild, "style.css 的 :root 裡找不到 --css-build");
+  assert.strictEqual(cssBuild[1], version,
+    "style.css 的 --css-build 跟 sw.js 的 VERSION 不一樣，開機健檢會誤判成快取錯配並一直想自救");
+
+  const stamped = assetsInHtml().filter(function(a) { return /\.(css|js)(\?|$)/.test(a); });
+  assert.ok(stamped.length >= 10, "index.html 裡找不到預期數量的 css/js");
+  stamped.forEach(function(asset) {
+    assert.ok(asset.indexOf("?v=" + version) > 0,
+      asset + " 沒有帶 ?v=" + version + "（新 HTML 會配到舊快取裡的這個檔案）");
+  });
 });

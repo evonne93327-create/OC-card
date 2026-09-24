@@ -12,27 +12,41 @@
    動到 index.html 引用的任何檔案，就把下面的 VERSION 加一號，
    否則舊快取不會被清掉。tests/shell-manifest.test.js 會檢查 SHELL
    這份清單跟 index.html 實際載入的檔案對不對得上。
+
+   ---- 為什麼 css/js 的網址要帶 ?v= ----
+
+   網路優先只保證「每個檔案各自是新的」，不保證「這一批是同一版」。
+   實際踩到的情況：手機拿到新的 index.html，但 style.css 因為還在瀏覽器
+   的 HTTP 快取有效期內（GitHub Pages 給 max-age=600）而是舊的那一份。
+   新 HTML 的 class 名稱在舊 CSS 裡一條都不存在，版面整個散掉——而且
+   看起來像程式壞了，不像快取問題。
+
+   帶上 ?v=<VERSION> 之後這件事從結構上不可能發生：版本一跳，css/js 的
+   網址就變成一個任何快取裡都沒有的新網址，一定會去拿新的；而舊的
+   index.html 只會去要舊網址，配到的也是一整套舊的（一致的舊版總比
+   半新半舊好，而且十分鐘內會自己好）。
    ========================================================== */
 
-const VERSION = 'v2';
-const CACHE = 'oc-card-' + VERSION;
+const VERSION = '5';                  // 動到 index.html 引用的檔案就加一號
+const CACHE = 'oc-card-v' + VERSION;
+const STAMP = '?v=' + VERSION;        // 必須跟 index.html 裡的 ?v= 完全一致
 
 // 離線時要能完整開起來所需的檔案
 const SHELL = [
   './',
   './index.html',
   './manifest.json',
-  './ui-tokens.css',
-  './style.css',
-  './js/state.js',
-  './js/main.js',
-  './js/storage.js',
-  './js/cards.js',
-  './js/editor.js',
-  './js/modal.js',
-  './js/import-export.js',
-  './js/theme.js',
-  './js/app.js',
+  './ui-tokens.css' + STAMP,
+  './style.css' + STAMP,
+  './js/state.js' + STAMP,
+  './js/main.js' + STAMP,
+  './js/storage.js' + STAMP,
+  './js/cards.js' + STAMP,
+  './js/editor.js' + STAMP,
+  './js/modal.js' + STAMP,
+  './js/import-export.js' + STAMP,
+  './js/theme.js' + STAMP,
+  './js/app.js' + STAMP,
   './icons/favicon-16.png',
   './icons/favicon-32.png',
   './icons/favicon-48.png',
@@ -70,8 +84,19 @@ self.addEventListener('fetch', function (event) {
   if (req.method !== 'GET') return;
   if (new URL(req.url).origin !== self.location.origin) return;
 
+  /* 首頁本身要強制跟伺服器對一次（If-None-Match），不要吃瀏覽器的
+     HTTP 快取——不然剛部署的十分鐘內，重新整理拿到的還是舊的 index.html。
+     css/js 靠 ?v= 分版就夠了，不需要每次都重新驗證。
+
+     從導覽請求建出帶 cache 選項的 Request 在少數瀏覽器會丟例外，
+     所以包起來，失敗就退回原本的請求。 */
+  let request = req;
+  if (req.mode === 'navigate') {
+    try { request = new Request(req, { cache: 'no-cache' }); } catch (e) { request = req; }
+  }
+
   event.respondWith(
-    fetch(req).then(function (res) {
+    fetch(request).then(function (res) {
       // 只快取正常的同源回應，避免把錯誤頁或不透明回應存進去
       if (res && res.status === 200 && res.type === 'basic') {
         const copy = res.clone();

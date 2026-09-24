@@ -27,8 +27,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="ui-tokens.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="ui-tokens.css?v=5">
+  <link rel="stylesheet" href="style.css?v=5">
 
   <!-- 主題要在 CSS 生效前就定下來，否則夜間模式每次開啟都會先閃一下白畫面。
        這份是 js/theme.js 的極短版，邏輯必須跟那邊一致（key 也是）。 -->
@@ -302,7 +302,10 @@
   <!-- ========== 分類設定 ========== -->
   <div class="modal-overlay" id="paletteModal">
     <div class="modal-card">
-      <h2 class="modal-title">分類設定</h2>
+      <div class="modal-head">
+        <div class="modal-title">🎨 分類設定</div>
+        <button class="icon-sm-btn" title="關閉" onclick="closePaletteModal()">✕</button>
+      </div>
       <p class="modal-hint">顏色固定七種，名稱可以改成你自己的分類方式。</p>
       <div id="paletteList"></div>
       <div class="modal-actions">
@@ -315,7 +318,10 @@
   <!-- ========== 垃圾桶 ========== -->
   <div class="modal-overlay" id="trashModal">
     <div class="modal-card wide">
-      <h2 class="modal-title">垃圾桶</h2>
+      <div class="modal-head">
+        <div class="modal-title">♻️ 垃圾桶</div>
+        <button class="icon-sm-btn" title="關閉" onclick="closeTrashModal()">✕</button>
+      </div>
       <p class="modal-hint" id="trashHint"></p>
       <div id="trashList" class="trash-list"></div>
       <div class="modal-actions">
@@ -328,7 +334,10 @@
   <!-- ========== 匯出 ========== -->
   <div class="modal-overlay" id="exportModal">
     <div class="modal-card">
-      <h2 class="modal-title">匯出</h2>
+      <div class="modal-head">
+        <div class="modal-title">📤 匯出角色卡</div>
+        <button class="icon-sm-btn" title="關閉" onclick="closeExportModal()">✕</button>
+      </div>
       <label class="field-label" for="exportScope">要匯出哪些卡片</label>
       <select id="exportScope" class="text-input"></select>
 
@@ -358,44 +367,110 @@
     </div>
   </div>
 
-  <!-- ========== 設定總表 ========== -->
+  <!-- ========== 設定總表 ==========
+       版面照 world_2 的設定彈窗：一列一件事，左邊圖示、中間標題＋說明、
+       右邊現在的值與 ›。只有標題的話，使用者得自己猜「分類設定」到底會
+       改到什麼。 -->
   <div class="modal-overlay" id="settingsModal">
     <div class="modal-card">
-      <h2 class="modal-title">設定</h2>
+      <div class="modal-head">
+        <div class="modal-title">⚙️ 設定</div>
+        <button class="icon-sm-btn" title="關閉" onclick="closeSettingsModal()">✕</button>
+      </div>
+
       <div class="settings-list">
-        <button class="settings-row" onclick="settingsGoTo(openAppearanceModal)">
-          <span>🌓 外觀</span><span class="settings-value" id="appearanceRowValue"></span>
+        <button type="button" class="settings-row" onclick="settingsGoTo(openAppearanceModal)">
+          <span class="settings-row-icon">🌓</span>
+          <span class="settings-row-text">
+            <span class="settings-row-title">外觀</span>
+            <span class="settings-row-desc">日間、夜間或跟隨系統</span>
+          </span>
+          <span class="settings-row-value" id="appearanceRowValue"></span>
+          <span class="settings-row-go">›</span>
         </button>
-        <button class="settings-row" onclick="settingsGoTo(openPaletteModal)">
-          <span>🎨 分類設定</span><span class="settings-value">七種分類的名稱</span>
+
+        <button type="button" class="settings-row" onclick="settingsGoTo(openPaletteModal)">
+          <span class="settings-row-icon">🎨</span>
+          <span class="settings-row-text">
+            <span class="settings-row-title">分類設定</span>
+            <span class="settings-row-desc">七種分類顏色的名稱，可以改成你自己的分法</span>
+          </span>
+          <span class="settings-row-go">›</span>
         </button>
-        <button class="settings-row" onclick="settingsGoTo(openExportModal)">
-          <span>📤 匯出</span><span class="settings-value">JSON／HTML／TXT</span>
+
+        <button type="button" class="settings-row" onclick="settingsGoTo(openExportModal)">
+          <span class="settings-row-icon">📤</span>
+          <span class="settings-row-text">
+            <span class="settings-row-title">匯出角色卡</span>
+            <span class="settings-row-desc">存成 JSON、HTML 或 TXT，也可以轉給世界觀架構工作台</span>
+          </span>
+          <span class="settings-row-go">›</span>
         </button>
-        <button class="settings-row" onclick="settingsGoTo(triggerImportFile)">
-          <span>📥 匯入</span><span class="settings-value">JSON 檔案</span>
+
+        <button type="button" class="settings-row" onclick="settingsGoTo(triggerImportFile)">
+          <span class="settings-row-icon">📥</span>
+          <span class="settings-row-text">
+            <span class="settings-row-title">匯入角色卡</span>
+            <span class="settings-row-desc">從 JSON 檔匯入到目前的作品，也吃世界觀工作台匯出的文檔</span>
+          </span>
         </button>
-        <button class="settings-row" onclick="settingsGoTo(openTrashModal)">
-          <span>🗑️ 垃圾桶</span><span class="settings-value" id="trashRowValue"></span>
+
+        <button type="button" class="settings-row" onclick="exportFullBackup()">
+          <span class="settings-row-icon">💾</span>
+          <span class="settings-row-text">
+            <span class="settings-row-title">備份完整資料</span>
+            <span class="settings-row-desc">所有作品與角色卡存成一個 JSON 檔下載</span>
+          </span>
         </button>
+
+        <button type="button" class="settings-row" onclick="settingsGoTo(openTrashModal)">
+          <span class="settings-row-icon">♻️</span>
+          <span class="settings-row-text">
+            <span class="settings-row-title">垃圾桶</span>
+            <span class="settings-row-desc">復原或永久刪除丟掉的角色卡，保留 60 天</span>
+          </span>
+          <span class="settings-row-value" id="trashRowValue"></span>
+          <span class="settings-row-go">›</span>
+        </button>
+
+        <button type="button" class="settings-row" onclick="forceRefreshApp()">
+          <span class="settings-row-icon">🔄</span>
+          <span class="settings-row-text">
+            <span class="settings-row-title">強制更新</span>
+            <span class="settings-row-desc">版面看起來怪怪的就按這個。清掉程式快取重新載入，角色卡不會被刪掉</span>
+          </span>
+        </button>
+
         <div class="settings-row is-static">
-          <span>💾 本機用量</span><span class="settings-value" id="storageRowValue"></span>
+          <span class="settings-row-icon">🏷️</span>
+          <span class="settings-row-text">
+            <span class="settings-row-title">版本</span>
+            <span class="settings-row-desc">回報問題時把這個號碼一起講，就知道你手上是不是最新的</span>
+          </span>
+          <span class="settings-row-value is-build" id="buildRowValue"></span>
         </div>
+
         <div class="settings-row is-static">
-          <span>📊 目前收藏</span><span class="settings-value" id="statsRowValue"></span>
+          <span class="settings-row-icon">📊</span>
+          <span class="settings-row-text">
+            <span class="settings-row-title">目前收藏</span>
+            <span class="settings-row-desc" id="statsRowDesc"></span>
+          </span>
+          <span class="settings-row-value" id="storageRowValue"></span>
         </div>
       </div>
-      <p class="modal-hint">資料存在這台裝置的瀏覽器裡，換裝置不會跟著走——重要的設定請定期匯出備份。</p>
-      <div class="modal-actions">
-        <button class="btn btn-primary" onclick="closeSettingsModal()">關閉</button>
-      </div>
+
+      <p class="modal-hint">資料存在這台裝置的瀏覽器裡，換裝置不會跟著走——重要的設定請定期備份。</p>
     </div>
   </div>
 
   <!-- ========== 外觀 ========== -->
   <div class="modal-overlay" id="appearanceModal">
     <div class="modal-card">
-      <h2 class="modal-title">外觀</h2>
+      <div class="modal-head">
+        <div class="modal-title">🌓 外觀</div>
+        <button class="icon-sm-btn" title="關閉" onclick="closeAppearanceModal()">✕</button>
+      </div>
       <div class="theme-choice" id="themeChoiceRow">
         <button class="theme-opt" data-theme="auto" onclick="setThemePref('auto')">跟隨系統</button>
         <button class="theme-opt" data-theme="light" onclick="setThemePref('light')">日間</button>
@@ -464,18 +539,22 @@
   <input type="file" id="importFileInput" accept=".json,application/json" style="display:none;" onchange="handleImportFileSelected(event)">
   <div class="toast" id="toast"></div>
 
-  <!-- 載入順序有相依性：state.js 定義常數與 safeStorage*，main.js 的純函式
+  <!-- css 與 js 的網址都帶 ?v=<版本>，版本值必須跟 sw.js 的 VERSION 一致
+       （tests/shell-manifest.test.js 會檢查）。這是為了讓「新的 HTML 配到
+       舊的 CSS」這件事不可能發生——見 sw.js 開頭的說明。
+
+       載入順序有相依性：state.js 定義常數與 safeStorage*，main.js 的純函式
        （isSafeImageSrc、dedupeTags、formatTime）在 storage.js 載入時就會被
        呼叫到，所以 main.js 必須排在 storage.js 前面。改順序前請先看
        tests/shell-manifest.test.js。 -->
-  <script src="js/state.js"></script>
-  <script src="js/main.js"></script>
-  <script src="js/storage.js"></script>
-  <script src="js/cards.js"></script>
-  <script src="js/editor.js"></script>
-  <script src="js/modal.js"></script>
-  <script src="js/import-export.js"></script>
-  <script src="js/theme.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/state.js?v=5"></script>
+  <script src="js/main.js?v=5"></script>
+  <script src="js/storage.js?v=5"></script>
+  <script src="js/cards.js?v=5"></script>
+  <script src="js/editor.js?v=5"></script>
+  <script src="js/modal.js?v=5"></script>
+  <script src="js/import-export.js?v=5"></script>
+  <script src="js/theme.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
 </body>
 </html>
