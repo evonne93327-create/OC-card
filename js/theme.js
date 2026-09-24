@@ -153,15 +153,21 @@ function renderSettingsRows() {
   const t = el("trashRowValue");
   if (t) t.textContent = appData.trash.cards.length + " 張";
 
-  const s = el("storageRowValue");
-  if (s) {
-    const used = localStorageUsage();
-    s.textContent = used === null ? "無法讀取"
-      : (used / 1024 < 1024 ? Math.round(used / 1024) + " KB" : (used / 1024 / 1024).toFixed(1) + " MB");
+  /* 「多少張卡」放說明那一行、「用掉多少空間」放右邊的值。
+     反過來的話，右邊那串長字會把說明擠成兩行，兩邊都難讀。 */
+  const desc = el("statsRowDesc");
+  if (desc) {
+    desc.textContent = appData.cards.length + " 張角色卡 ・ " +
+      appData.groups.length + " 個作品（瀏覽器本機上限約 5MB）";
   }
 
-  const c = el("statsRowValue");
-  if (c) c.textContent = appData.cards.length + " 張卡片 ・ " + appData.groups.length + " 個作品";
+  const used = localStorageUsage();
+  const size = el("storageRowValue");
+  if (size) {
+    size.textContent = used === null ? "—"
+      : (used / 1024 < 1024 ? Math.round(used / 1024) + " KB"
+                            : (used / 1024 / 1024).toFixed(1) + " MB");
+  }
 
   const b = el("buildRowValue");
   if (b) b.textContent = "v" + APP_BUILD;

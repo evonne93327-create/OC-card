@@ -1010,6 +1010,11 @@ body.no-card-open .editor-empty { display: flex; }
 }
 .modal-card.wide { width: 620px; }
 .modal-title { margin: 0; font-size: var(--fs-16); font-weight: 700; font-family: var(--font-display); }
+
+/* 彈窗標題列：標題靠左、關閉叉叉靠右。用一般的 flex 子元素而不是絕對定位，
+   因為 .modal-card 會 overflow-y: auto，絕對定位的叉叉會跟著內容一起捲走。 */
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-10); }
+.modal-head .modal-title { flex: 1; min-width: 0; }
 .modal-hint { margin: 0; font-size: var(--fs-12); color: var(--text-secondary); line-height: 1.7; }
 .modal-actions { display: flex; gap: var(--sp-6); justify-content: flex-end; flex-wrap: wrap; margin-top: var(--sp-4); }
 
@@ -1136,24 +1141,39 @@ body.no-card-open .editor-empty { display: flex; }
 .export-opt strong { font-size: var(--fs-12); }
 .export-opt span { font-size: var(--fs-10); color: var(--text-secondary); line-height: 1.6; }
 
-.settings-list { display: flex; flex-direction: column; gap: var(--sp-4); }
+/* 設定列。照 world_2 的做法：左邊圖示、中間標題＋一行說明、右邊現在的值
+   與 ›。只有標題的話，使用者得自己猜「分類設定」到底會改到什麼——
+   那一行說明就是為了讓人不用猜。 */
+.settings-list { display: flex; flex-direction: column; gap: var(--sp-8); padding-top: var(--sp-4); }
 .settings-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-10);
-  padding: var(--sp-10) var(--sp-12);
-  background: var(--bg-sunken);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  font-size: var(--fs-12);
-  font-weight: 600;
+  gap: var(--sp-12);
   width: 100%;
+  padding: var(--sp-14) var(--sp-16);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  font-family: var(--font-ui);
   text-align: left;
+  transition: background 0.15s, border-color 0.15s;
 }
-button.settings-row:hover { border-color: var(--accent-line); }
-.settings-row.is-static { cursor: default; opacity: 0.85; }
-.settings-value { font-size: var(--fs-10); color: var(--text-muted); font-weight: 400; }
+button.settings-row:hover { background: var(--bg-sunken); border-color: var(--accent-line); }
+.settings-row.is-static { cursor: default; background: var(--bg-sunken); }
+
+.settings-row-icon { font-size: var(--fs-20); line-height: 1; flex: none; }
+.settings-row-text { display: flex; flex-direction: column; gap: var(--sp-2); flex: 1; min-width: 0; }
+.settings-row-title { font-size: var(--fs-14); font-weight: 600; color: var(--text-primary); }
+.settings-row-desc { font-size: var(--fs-12); color: var(--text-secondary); line-height: 1.4; }
+.settings-row-value { font-size: var(--fs-12); color: var(--text-muted); flex: none; text-align: right; white-space: nowrap; }
+/* 版本號要一眼認得出來——它存在的理由就是給人唸出來回報問題用的 */
+.settings-row-value.is-build {
+  font-size: var(--fs-14);
+  font-weight: 700;
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+}
+.settings-row-go { font-size: var(--fs-18); color: var(--text-muted); flex: none; line-height: 1; }
 
 .theme-choice { display: flex; gap: var(--sp-6); }
 .theme-opt {
@@ -1322,6 +1342,44 @@ button.settings-row:hover { border-color: var(--accent-line); }
 
   /* 提示條要浮在底部作品列之上 */
   .toast { bottom: calc(56px + var(--safe-b) + var(--sp-16)); }
+}
+
+/* ==========================================================
+   手機橫放（矮螢幕）
+
+   844×390 這種比例下，頂欄 54 ＋ 條件列 47 ＋ 底部作品列 56 就吃掉
+   四成高度，剩下的地方連一張卡都放不完整。橫放時把這幾條壓扁，
+   把高度還給內容——橫放的人多半是在看卡片，不是在看工具列。
+   ========================================================== */
+
+@media (max-height: 500px) {
+  :root { --card-avatar: 44px; }
+
+  aside.world-rail { height: calc(46px + var(--safe-b)); padding-top: var(--sp-4); padding-bottom: var(--safe-b); }
+  .world-rail-btn, .world-rail-btn.add-btn { width: 36px; height: 36px; font-size: var(--fs-16); }
+  .app-main-layout {
+    height: calc(100vh - 46px - var(--safe-b));
+    height: calc(100dvh - 46px - var(--safe-b));
+  }
+  aside.sidebar-directory { bottom: calc(46px + var(--safe-b)); }
+
+  header.top-nav-bar { height: calc(44px + var(--safe-t)); min-height: calc(44px + var(--safe-t)); }
+  .nav-btn-icon { width: 34px; height: 34px; }
+  .directory-top-bar { height: calc(44px + var(--safe-t)); min-height: calc(44px + var(--safe-t)); }
+
+  .wall-bar { padding: var(--sp-4) var(--sp-10); }
+  .wall-scroll { padding: var(--sp-8) var(--sp-10); }
+  .oc-card { padding: var(--sp-12) var(--sp-10) var(--sp-10); }
+  .card-name { font-size: var(--fs-16); }
+
+  .editor-meta-panel { padding: var(--sp-6) var(--sp-12); }
+  .editor-avatar { width: 40px; height: 40px; font-size: var(--fs-18); }
+  .meter { display: none; }        /* 橫放時這條可有可無，把高度讓出來 */
+
+  .toast { bottom: calc(46px + var(--safe-b) + var(--sp-8)); }
+  .modal-card { max-height: 92dvh; padding: var(--sp-14); }
+  .settings-row { padding: var(--sp-10) var(--sp-12); }
+  .settings-row-desc { display: none; }   /* 橫放時說明太佔高度，只留標題 */
 }
 
 /* 動畫減量：使用者在系統裡關掉動態效果就不要再動 */

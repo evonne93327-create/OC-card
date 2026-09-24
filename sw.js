@@ -27,7 +27,7 @@
    半新半舊好，而且十分鐘內會自己好）。
    ========================================================== */
 
-const VERSION = '3';                  // 動到 index.html 引用的檔案就加一號
+const VERSION = '4';                  // 動到 index.html 引用的檔案就加一號
 const CACHE = 'oc-card-v' + VERSION;
 const STAMP = '?v=' + VERSION;        // 必須跟 index.html 裡的 ?v= 完全一致
 
