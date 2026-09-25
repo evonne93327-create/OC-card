@@ -5,7 +5,7 @@
 /* 這份程式碼是哪一版。顯示在「設定」裡，讓使用者回報問題時講得出來
    ——「版面跑掉了」如果伴隨一個舊版本號，那就是快取而不是程式的問題。
    必須跟 sw.js 的 VERSION 一致，tests/shell-manifest.test.js 會檢查。 */
-const APP_BUILD = "5";
+const APP_BUILD = "6";
 
 /* 標籤與卡片的分類色。排序是「灰 紅 橙 黃 綠 藍 紫」——灰是中性放最前，
    其餘照色相環。顯示順序一律以這個物件的鍵順序為準，要改排序改這裡就好。
@@ -19,6 +19,30 @@ const DEFAULT_PALETTES = {
   "c_green":  { name: "已完成", bg: "#DCEAE1", text: "#2C5A44" },
   "c_blue":   { name: "勢力／陣營", bg: "#DCE7F0", text: "#28506B" },
   "c_purple": { name: "反派／對立", bg: "#E7DFF0", text: "#553B76" }
+};
+
+/* 關係連線專屬色（比分類色更飽和、辨識度更高）。
+   這一組與世界觀工作台的 EDGE_COLORS 同名同值，兩邊的白板看起來才是
+   同一套工具。 */
+const EDGE_COLORS = {
+  "e_gray":   { name: "灰", stroke: "#6E6152" },
+  "e_red":    { name: "紅", stroke: "#D9433B" },
+  "e_orange": { name: "橙", stroke: "#D97A2B" },
+  "e_yellow": { name: "黃", stroke: "#C9A227" },
+  "e_green":  { name: "綠", stroke: "#2E8B57" },
+  "e_blue":   { name: "藍", stroke: "#2F6FB0" },
+  "e_purple": { name: "紫", stroke: "#7A4FB0" }
+};
+
+/* 連線在夜間也要提亮，原本那組在深色底上會糊成一團 */
+const DARK_EDGE_COLORS = {
+  "e_gray":   { stroke: "#A0937E" },
+  "e_red":    { stroke: "#EE6A60" },
+  "e_orange": { stroke: "#E8A35C" },
+  "e_yellow": { stroke: "#D9BC5A" },
+  "e_green":  { stroke: "#5FBE8A" },
+  "e_blue":   { stroke: "#6BA5DC" },
+  "e_purple": { stroke: "#A986DC" }
 };
 
 /* 夜間版的同一組分類。深色底配亮字，色相跟日間版對齊，
@@ -55,6 +79,15 @@ function getPalette(key) {
 
 function paletteKeys() {
   return Object.keys(DEFAULT_PALETTES);
+}
+
+function edgeColorKeys() {
+  return Object.keys(EDGE_COLORS);
+}
+
+function getEdgeStroke(colorId) {
+  const id = EDGE_COLORS[colorId] ? colorId : "e_gray";
+  return (isDarkTheme() ? DARK_EDGE_COLORS[id] : EDGE_COLORS[id]).stroke;
 }
 
 
@@ -133,6 +166,14 @@ const MAX_TAG_LEN = 30;
 const AVATAR_MAX_EDGE = 320;
 const AVATAR_JPEG_QUALITY = 0.82;
 
+/* 關係圖：節點預設寬度（世界座標，與 CSS 的 .canvas-node 寬度一致），
+   以及縮放上下限。縮到 0.3 以下就只剩色塊、放到 3 以上一個畫面放不下
+   兩張卡，兩邊都沒有意義。 */
+const CANVAS_NODE_W = 160;
+const CANVAS_MIN_SCALE = 0.35;
+const CANVAS_MAX_SCALE = 2.5;
+const MAX_EDGE_LABEL_LEN = 40;
+
 /* 垃圾桶保留天數。超過就自動清掉，否則刪掉的卡片會永遠佔著那 5MB
    ——尤其是帶頭像的。 */
 const TRASH_RETENTION_DAYS = 60;
@@ -156,8 +197,22 @@ const INITIAL_APP_DATA = {
   version: 1,
   colorPalette: JSON.parse(JSON.stringify(DEFAULT_PALETTES)),
   groups: [
-    { id: "g_main", name: "我的角色", icon: "🎭" },
-    { id: "g_side", name: "同人／客串", icon: "✨" }
+    {
+      id: "g_main", name: "我的角色", icon: "🎭",
+      /* 關係圖的節點與連線掛在作品底下：換作品就換一張關係圖，
+         跟卡片牆的範圍一致。 */
+      canvas: {
+        nodes: [
+          { id: "n_demo_1", cardId: "card_demo_1", x: 80, y: 120 },
+          { id: "n_demo_2", cardId: "card_demo_2", x: 360, y: 260 }
+        ],
+        edges: [
+          { id: "e_demo_1", source: "n_demo_1", target: "n_demo_2",
+            label: "舊識，互相看不順眼但性命相托", color: "e_orange", arrow: "both" }
+        ]
+      }
+    },
+    { id: "g_side", name: "同人／客串", icon: "✨", canvas: { nodes: [], edges: [] } }
   ],
   trash: { cards: [], groups: [] },
   cards: [
@@ -222,7 +277,6 @@ const INITIAL_APP_DATA = {
 let appData = JSON.parse(JSON.stringify(INITIAL_APP_DATA));
 
 let activeGroupId = "g_main";
-let openedCardId = null;        // 詳情視窗正在看的那張
 let editingCardId = null;       // 編輯面板正在改的那張（null = 沒在編輯）
 let activeView = "wall";        // "wall" | "edit"
 
@@ -232,9 +286,16 @@ let filterColor = null;         // 只看某個分類顏色
 let filterFavorite = false;     // 只看我的最愛
 let sortMode = "updated";
 
+/* ===== 關係圖的檢視狀態 ===== */
+let canvasTransform = { x: 0, y: 0, scale: 1 };
+let connectMode = false;           // 是不是正在「連關係」
+let connectingFromNodeId = null;   // 連線模式裡已經點過的第一個節點
+let editingEdgeId = null;          // 連線編輯視窗正在改的那一條
+
 let isBatchMode = false;
 let batchSelected = new Set();
 
+let cardModalMode = "view";     // 卡片視窗：檢視或編輯
 let iconPickerTarget = null;    // "card" | "group"
 let editorDirty = false;        // 編輯面板有沒有還沒存的修改
 let editorAutosaveTimer = null;

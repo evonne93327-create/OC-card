@@ -13,7 +13,7 @@
 
 | | |
 |---|---|
-| service worker | **v5** |
+| service worker | **v6** |
 | 開發分支 | `claude/oc-character-card-archive-tqvgd6` |
 | 測試 | `node --test`，25 項全綠 |
 | 雲端同步 | 還沒做（見下方〈還沒做的事〉） |
@@ -70,10 +70,10 @@ HTTP 快取就可能回舊的那一份。而新 HTML 的 class 名稱在舊 CSS 
 
 | 檔案 | 位置 |
 |---|---|
-| `sw.js` | `const VERSION = '5'`（SHELL 會自動接上 `STAMP`） |
-| `index.html` | 每個 `<link>` 與 `<script>` 的 `?v=5` |
-| `js/state.js` | `const APP_BUILD = "5"`（設定裡顯示的版本） |
-| `style.css` | `:root { --css-build: "5" }`（開機健檢用） |
+| `sw.js` | `const VERSION = '6'`（SHELL 會自動接上 `STAMP`） |
+| `index.html` | 每個 `<link>` 與 `<script>` 的 `?v=6` |
+| `js/state.js` | `const APP_BUILD = "6"`（設定裡顯示的版本） |
+| `style.css` | `:root { --css-build: "6" }`（開機健檢用） |
 
 `tests/shell-manifest.test.js` 會把四邊對一次，漏掉哪個都會紅。
 
@@ -103,7 +103,31 @@ HTTP 快取就可能回舊的那一份。而新 HTML 的 class 名稱在舊 CSS 
   時間戳的網址重載。它是自救按鈕，說明文字直接寫「版面看起來怪怪的就按
   這個」，因為使用者不會知道那叫快取。
 
-### 6. 版面骨架是照 world_2 抄的，不要自己另創一套
+### 6. 關係圖的連線幾何不要「簡化」
+
+`buildEdgeCurve()`（js/canvas.js）是從 world_2 的白板移植過來的，連同它
+踩過的坑：**先畫中心到中心的完整曲線，再裁掉兩端節點內部那一段**。
+
+早期版本（那邊的）把「出發點」與「彎曲方向」分開算：出發點沿邊框排開、
+彎曲沿兩節點中心連線的法線。節點斜向擺放時兩者的排列方向會相反，線一定
+會在中段互相穿越——拿掉彎曲變直線沒事、加回彎曲又交叉，調參數治不好。
+
+裁切版本的出發點是曲線自己決定的：彎得越開的線，交點自然落在越外側，
+順序必定跟彎曲一致，結構上不可能交叉。另外用「出發角度」而不是「中段
+彎曲量」當參數也是必要的（見程式碼裡 MAX_DEPART_ANGLE 的註解）。
+
+兩個節點重疊到沒有可畫區段時回傳 `null`、整條線不畫——那是正確行為，
+不是 bug：節點都疊在一起了，畫出來的線也在卡片底下看不到。
+
+另外兩條：
+
+- **節點層要 `pointer-events: none`**（節點自己再開回來）。那一層是
+  `inset: 0` 的整片透明 div 蓋在 SVG 上，不關掉的話關係線點不到——而點線
+  是編輯關係的唯一入口。
+- **連線的點擊範圍是一條 stroke-width 18 的透明線**。2px 的線在手機上
+  根本點不到。
+
+### 7. 版面骨架是照 world_2 抄的，不要自己另創一套
 
 三欄：作品直欄 62px ＋ 角色清單側欄 280px ＋ 主區（頂欄 54px + 內容）。
 手機版（`max-width: 768px` **或** `max-height: 500px`）作品欄變成置底橫列、
@@ -118,7 +142,7 @@ HTTP 快取就可能回舊的那一份。而新 HTML 的 class 名稱在舊 CSS 
 幾乎沒有地方可以看卡片。`isMobileLayout()`（js/main.js）的判斷式必須
 跟 CSS 的斷點逐字一致，否則會出現「CSS 認為是手機、JS 認為是電腦」的錯位。
 
-### 7. 用到的 CSS 變數一定要在 ui-tokens.css 定義得出來
+### 8. 用到的 CSS 變數一定要在 ui-tokens.css 定義得出來
 
 `style.css` 寫了 `padding: var(--sp-7) var(--sp-12)`，但 token 檔裡沒有
 `--sp-7`。CSS 的行為是**整條宣告作廢**，不是「那一個值當成 0」——結果是
@@ -127,7 +151,7 @@ HTTP 快取就可能回舊的那一份。而新 HTML 的 class 名稱在舊 CSS 
 沒有任何錯誤訊息，畫面也還畫得出來，只是變醜，所以很容易一路帶上線。
 `tests/shell-manifest.test.js` 現在會把兩邊對一次。
 
-### 8. `<script>` 的載入順序有相依性
+### 9. `<script>` 的載入順序有相依性
 
 `js/main.js` 必須排在 `js/storage.js` 前面：storage.js 在載入時就會跑
 `ensureCardShape()`，而它用到的 `isSafeImageSrc`／`dedupeTags`／`formatTime`
@@ -136,7 +160,7 @@ HTTP 快取就可能回舊的那一份。而新 HTML 的 class 名稱在舊 CSS 
 `tests/shell-manifest.test.js` 有釘住這件事，`tests/helpers/load-app.js`
 也照同一個順序載入。
 
-### 9. 主題的唯一判斷來源是 `<html data-theme>`
+### 10. 主題的唯一判斷來源是 `<html data-theme>`
 
 卡片的色條、標籤底色、完成度量表是 JS 直接寫進 `style` 的，CSS 的
 `@media (prefers-color-scheme)` 管不到它們。所以主題解析一律走
@@ -146,7 +170,7 @@ HTTP 快取就可能回舊的那一份。而新 HTML 的 class 名稱在舊 CSS 
 `index.html` 的 `<head>` 裡有一份極短版（避免開場閃白畫面），**它的 key
 必須跟 `theme.js` 的 `THEME_KEY` 一致**，測試有檢查。
 
-### 10. 刪除一律進垃圾桶
+### 11. 刪除一律進垃圾桶
 
 角色設定是累積很久的東西，誤刪的代價跟「刪一則便條」完全不同。
 垃圾桶保留 60 天（`TRASH_RETENTION_DAYS`），過期在載入時自動清掉。
@@ -208,9 +232,6 @@ HTTP 快取就可能回舊的那一份。而新 HTML 的 class 名稱在舊 CSS 
   設定裡有講。要做的話直接搬那邊的 `api.js`／`gdrive.js`／`sync.js`——
   但要先讀那邊 NOTES 裡「寧可停下來問，也不默默覆蓋」那一節，衝突處理的
   原則不能自己重新發明。
-- **卡片之間的關係。** 「A 是 B 的師父」這種現在只能寫在「人際關係」段落裡
-  的純文字。真的要做關係線的話，那正是 world_2 白板的強項，先想清楚要不要
-  在這裡重做一次。
 - **卡片排序拖曳。** 目前只能用排序方式決定順序，不能手動拖到想要的位置。
 - **多張插圖。** 現在一張卡只有一個頭像。要放立繪／表情差分的話，
   得先解決 localStorage 5MB 的天花板（可能要換 IndexedDB），不是加個欄位

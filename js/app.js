@@ -11,6 +11,7 @@ window.addEventListener("DOMContentLoaded", function() {
   setupGlobalKeyboardShortcuts();
   setupModalBackdropClose();
   setupLayoutWatch();
+  setupCanvasStage();
   initTheme();
   registerServiceWorker();
 });

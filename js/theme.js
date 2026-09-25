@@ -58,8 +58,8 @@ function setThemePref(pref) {
    直接寫進 style 的，那些得重畫才會換過來。 */
 function repaintThemedContent() {
   if (typeof renderWall === "function") renderWall();
-  if (typeof renderCardDetail === "function" && openedCardId) renderCardDetail();
-  if (activeView === "edit" && typeof renderEditor === "function" && editingCardId) renderEditor();
+  if (editingCardId && typeof setCardModalMode === "function") setCardModalMode(cardModalMode);
+  if (activeView === "canvas" && typeof renderCanvas === "function") renderCanvas();
   const palette = el("paletteModal");
   if (palette && palette.classList.contains("active")) renderPaletteModal();
 }
