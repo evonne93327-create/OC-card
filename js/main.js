@@ -307,21 +307,22 @@ function sidebarDrawerOpen() {
    body 的 data-view 決定誰在前面，切回來時捲動位置不會重來。 */
 
 function switchView(view) {
-  activeView = view === "card" ? "card" : "wall";
+  activeView = view === "canvas" ? "canvas" : "wall";
   document.body.setAttribute("data-view", activeView);
 
   const wallTab = el("tabWallBtn");
-  const cardTab = el("tabCardBtn");
+  const canvasTab = el("tabCanvasBtn");
   if (wallTab) wallTab.classList.toggle("active", activeView === "wall");
-  if (cardTab) cardTab.classList.toggle("active", activeView === "card");
-
-  // 沒有選角色就把編輯器蓋住，不要讓人對著一張空表單發呆
-  document.body.classList.toggle("no-card-open", activeView === "card" && !editingCardId);
+  if (canvasTab) canvasTab.classList.toggle("active", activeView === "canvas");
 
   if (activeView === "wall") {
     renderWall();
     const s = el("wallScroll");
     if (s) s.scrollTop = wallScrollMemo || 0;
+  } else {
+    /* 關係圖要等它真的顯示出來才畫：藏著的時候量不到節點高度
+       （offsetHeight 是 0），連線會裁在錯的地方。 */
+    renderCanvas();
   }
 }
 
@@ -347,7 +348,8 @@ function setupGlobalKeyboardShortcuts() {
       const openModal = document.querySelector(".modal-overlay.active");
       if (openModal) { closeModalEl(openModal); return; }
       if (sidebarDrawerOpen()) { closeSidebarMobile(); return; }
-      if (activeView === "card") { switchView("wall"); return; }
+      if (connectMode) { toggleConnectMode(); return; }
+      if (activeView === "canvas") { switchView("wall"); return; }
       if (searchQuery) { clearSearch(); return; }
       return;
     }
@@ -383,7 +385,9 @@ function setupGlobalKeyboardShortcuts() {
 function closeModalEl(modal) {
   if (!modal) return;
   const custom = {
-    "cardDetailModal": closeCardDetail,
+    "cardModal": closeCardModal,
+    "edgeModal": closeEdgeModal,
+    "addNodeModal": closeAddNodeModal,
     "groupModal": closeGroupModal,
     "paletteModal": closePaletteModal,
     "trashModal": closeTrashModal,

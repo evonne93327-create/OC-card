@@ -42,6 +42,7 @@ if (savedUI) {
   if (!Array.isArray(appData.groups) || !appData.groups.length) {
     appData.groups = [{ id: "g_main", name: "我的角色", icon: "🎭" }];
   }
+  appData.groups.forEach(function(g) { ensureGroupShape(g); });
   if (!Array.isArray(appData.cards)) appData.cards = [];
   if (!appData.colorPalette || typeof appData.colorPalette !== "object") {
     appData.colorPalette = JSON.parse(JSON.stringify(DEFAULT_PALETTES));
@@ -59,12 +60,56 @@ if (savedUI) {
 
   appData.cards.forEach(function(c) { ensureCardShape(c); });
 
+  /* 關係圖上指向「已經不存在的卡片」的節點要清掉。卡片可能是在垃圾桶
+     裡被永久刪除、或是匯入時整包換掉的——留著會畫出一個沒有名字的空節點。 */
+  const cardIds = new Set(appData.cards.map(function(c) { return c.id; }));
+  appData.groups.forEach(function(g) {
+    const before = g.canvas.nodes.length;
+    g.canvas.nodes = g.canvas.nodes.filter(function(n) { return cardIds.has(n.cardId); });
+    if (g.canvas.nodes.length !== before) ensureGroupShape(g);   // 順便掃掉孤兒連線
+  });
+
   // 上次停留的分組被刪掉了就回到第一個，否則會看到一片空的卡片牆，
   // 而且怎麼按都沒反應
   if (!appData.groups.some(function(g) { return g.id === activeGroupId; })) {
     activeGroupId = appData.groups[0].id;
   }
 })();
+
+/* 把一個作品補成完整形狀。關係圖是後來才加的，舊存檔裡沒有這一塊，
+   渲染端才能直接假設 group.canvas.nodes / .edges 一定存在。 */
+function ensureGroupShape(g) {
+  if (!g || typeof g !== "object") return g;
+  if (!g.canvas || typeof g.canvas !== "object") g.canvas = { nodes: [], edges: [] };
+  if (!Array.isArray(g.canvas.nodes)) g.canvas.nodes = [];
+  if (!Array.isArray(g.canvas.edges)) g.canvas.edges = [];
+
+  g.canvas.nodes = g.canvas.nodes.filter(isPlainObject).map(function(n) {
+    return {
+      id: typeof n.id === "string" && n.id ? n.id : ("n_" + Math.random().toString(36).slice(2, 9)),
+      cardId: typeof n.cardId === "string" ? n.cardId : "",
+      x: typeof n.x === "number" && isFinite(n.x) ? n.x : 0,
+      y: typeof n.y === "number" && isFinite(n.y) ? n.y : 0
+    };
+  });
+
+  const nodeIds = new Set(g.canvas.nodes.map(function(n) { return n.id; }));
+  g.canvas.edges = g.canvas.edges.filter(isPlainObject).map(function(e) {
+    return {
+      id: typeof e.id === "string" && e.id ? e.id : ("e_" + Math.random().toString(36).slice(2, 9)),
+      source: typeof e.source === "string" ? e.source : "",
+      target: typeof e.target === "string" ? e.target : "",
+      label: typeof e.label === "string" ? e.label.slice(0, MAX_EDGE_LABEL_LEN) : "",
+      color: EDGE_COLORS[e.color] ? e.color : "e_gray",
+      arrow: ["none", "to", "both"].indexOf(e.arrow) >= 0 ? e.arrow : "none"
+    };
+  /* 指向不存在節點的線不能留著：它畫不出來，但會一直參與同一對節點的
+     扇形展開計算，讓剩下的線莫名其妙偏掉。 */
+  }).filter(function(e) {
+    return e.source !== e.target && nodeIds.has(e.source) && nodeIds.has(e.target);
+  });
+  return g;
+}
 
 /* 把一張卡片補成完整形狀。匯入、還原垃圾桶、載入舊存檔都會經過這裡。 */
 function ensureCardShape(c) {

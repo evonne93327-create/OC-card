@@ -27,8 +27,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="ui-tokens.css?v=5">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="ui-tokens.css?v=6">
+  <link rel="stylesheet" href="style.css?v=6">
 
   <!-- 主題要在 CSS 生效前就定下來，否則夜間模式每次開啟都會先閃一下白畫面。
        這份是 js/theme.js 的極短版，邏輯必須跟那邊一致（key 也是）。 -->
@@ -127,7 +127,7 @@
       <div class="nav-group-center">
         <div class="tab-switch-box">
           <button class="tab-btn active" id="tabWallBtn" onclick="switchView('wall')">🎴 卡片牆</button>
-          <button class="tab-btn" id="tabCardBtn" onclick="switchView('card')">📇 角色卡</button>
+          <button class="tab-btn" id="tabCanvasBtn" onclick="switchView('canvas')">🕸️ 關係圖</button>
         </div>
       </div>
 
@@ -169,115 +169,180 @@
         </div>
       </section>
 
-      <!-- ========== 檢視二：角色卡（即時存檔的編輯器） ========== -->
-      <section class="view-panel" id="viewCard">
-        <div class="editor-meta-panel" id="editorMetaPanel">
-          <div class="meta-top-row">
-            <button type="button" class="editor-avatar" id="editorAvatar" title="換一個符號" onclick="openIconPickerForCard()"></button>
-
-            <div class="meta-main">
-              <input type="text" id="fieldName" class="card-title-input" placeholder="她／他叫什麼？"
-                     oninput="editorSetName(this.value)" autocomplete="off">
-              <div class="meta-sub-row">
-                <input type="text" id="fieldAlias" class="alias-input" placeholder="別名／稱號"
-                       oninput="editorSetAlias(this.value)" autocomplete="off">
-                <span class="stat-pill" id="editorMeterText"></span>
-                <span class="save-mark" id="editorSaveMark">已儲存</span>
-              </div>
-              <div class="meter"><span id="editorMeterBar"></span></div>
-            </div>
-
-            <div class="meta-right-col">
-              <button class="action-pill-btn" onclick="previewEditingCard()" title="預覽這張卡">👁️<span class="lbl">預覽</span></button>
-              <button class="action-pill-btn" onclick="duplicateEditingCard()" title="複製成另一張卡">⧉<span class="lbl">複製</span></button>
-              <button class="action-pill-btn danger" onclick="deleteEditingCard()" title="移到垃圾桶">🗑️<span class="lbl">刪除</span></button>
-            </div>
+      <!-- ========== 檢視二：關係圖 ========== -->
+      <section class="view-panel" id="viewCanvas">
+        <div class="canvas-bar">
+          <span class="wall-count" id="canvasCountText"></span>
+          <div class="canvas-bar-right">
+            <button class="nav-action-btn secondary" id="connectModeBtn" onclick="toggleConnectMode()">🔗 連關係</button>
+            <button class="nav-action-btn secondary" onclick="openAddNodeModal()">＋<span class="btn-text">加入角色</span></button>
+            <button class="icon-sm-btn" title="全部裝進畫面" onclick="fitCanvasView()">⤢</button>
+            <span class="canvas-zoom" id="canvasZoomText">100%</span>
           </div>
         </div>
 
-        <div class="editor-content-area" id="editScroll">
-          <div class="edit-inner">
+        <div class="canvas-stage" id="canvasStage">
+          <svg class="canvas-svg" id="canvasSvg"></svg>
+          <div class="canvas-nodes" id="canvasNodes"></div>
+          <div class="canvas-hint" id="canvasHint"></div>
 
-            <div class="edit-block">
-              <div class="block-head">
-                <h2>頭像與分類</h2>
-                <span class="block-hint" id="editorColorName"></span>
-              </div>
-              <div class="avatar-btns">
-                <button type="button" class="mini-btn" onclick="triggerAvatarPick()">上傳圖片</button>
-                <button type="button" class="mini-btn" onclick="openIconPickerForCard()">選符號</button>
-                <button type="button" class="mini-btn danger" id="avatarRemoveBtn" onclick="removeAvatar()" style="display:none;">移除圖片</button>
-              </div>
-              <input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="handleAvatarFile(event)">
-              <div class="palette-row-wrap" id="editorColorRow"></div>
-              <label class="field-label" for="editorGroupSelect">收在哪個作品裡</label>
-              <select id="editorGroupSelect" class="text-input" onchange="editorChangeGroup(this.value)"></select>
+          <div class="canvas-empty" id="canvasEmpty">
+            <div class="empty-icon">🕸️</div>
+            <p class="empty-title">這張關係圖還是空的</p>
+            <p class="empty-hint">把角色放上來，就可以拉線標註誰跟誰是什麼關係。</p>
+            <div class="empty-actions">
+              <button class="btn btn-primary" onclick="openAddNodeModal()">＋ 加入角色</button>
+              <button class="btn btn-secondary" onclick="addAllCardsToCanvas()">全部加進來</button>
             </div>
-
-            <div class="edit-block">
-              <div class="block-head">
-                <h2>一句話簡介</h2>
-                <span class="block-hint">如果只能用一句話介紹這個角色，你會怎麼說？</span>
-              </div>
-              <textarea id="fieldTagline" class="text-input" rows="2"
-                        placeholder="卡片牆上顯示的就是這一句。"
-                        oninput="editorSetTagline(this.value)"></textarea>
-            </div>
-
-            <div class="edit-block">
-              <div class="block-head">
-                <h2>資料列</h2>
-                <span class="block-hint">短短一行的東西（性別、年齡、身高…），欄位名稱可以自己改</span>
-              </div>
-              <div id="editorFieldList"></div>
-              <button type="button" class="add-row-btn" id="addFieldBtn" onclick="addEditorField()">＋ 加一列</button>
-            </div>
-
-            <div class="edit-block">
-              <div class="block-head">
-                <h2>設定段落</h2>
-                <span class="block-hint">大段的文字（外觀、性格、背景、關係…），順序可以調</span>
-              </div>
-              <div id="editorSectionList"></div>
-              <button type="button" class="add-row-btn" id="addSectionBtn" onclick="addEditorSection()">＋ 加一個段落</button>
-            </div>
-
-            <div class="edit-block">
-              <div class="block-head">
-                <h2>標籤</h2>
-                <span class="block-hint">用逗號或空白分隔，離開輸入框就會整理好</span>
-              </div>
-              <input type="text" id="fieldTags" class="text-input" placeholder="騎士、主角群、劍"
-                     onblur="editorCommitTags()" autocomplete="off">
-              <div class="suggest-row" id="tagSuggestRow"></div>
-            </div>
-
           </div>
-        </div>
-
-        <!-- 還沒選任何角色時蓋在上面 -->
-        <div class="editor-empty" id="editorEmpty">
-          <div class="empty-icon">📇</div>
-          <p class="empty-title">還沒選角色</p>
-          <p class="empty-hint">從左邊的清單點一個，或是從卡片牆點一張卡。</p>
-          <button class="btn btn-primary" onclick="createCard()">＋ 新增角色卡</button>
         </div>
       </section>
 
     </main>
   </div>
 
-  <!-- ========== 卡片詳情（展示用的預覽） ========== -->
-  <div class="modal-overlay" id="cardDetailModal">
-    <div class="modal-card wide">
+  <!-- ========== 卡片視窗 ==========
+       檢視與編輯在同一個視窗裡切換，不另開一個「編輯區」：一張卡的內容
+       本來就那些，換一個地方重畫一次只會讓人搞不清楚自己在哪裡。
+       編輯是即時存檔的（見 js/editor.js）。 -->
+  <div class="modal-overlay" id="cardModal">
+    <div class="modal-card wide card-modal">
+      <div class="modal-head">
+        <div class="card-mode-switch">
+          <button class="mode-btn active" id="cardModeViewBtn" onclick="setCardModalMode('view')">👁️ 檢視</button>
+          <button class="mode-btn" id="cardModeEditBtn" onclick="setCardModalMode('edit')">✏️ 編輯</button>
+        </div>
+        <span class="save-mark" id="editorSaveMark"></span>
+        <button class="icon-sm-btn" title="關閉" onclick="closeCardModal()">✕</button>
+      </div>
+
+      <!-- 檢視 -->
       <div id="cardDetailBody"></div>
+
+      <!-- 編輯 -->
+      <div id="cardEditBody">
+        <div class="edit-identity">
+          <button type="button" class="editor-avatar" id="editorAvatar" title="換一個符號" onclick="openIconPickerForCard()"></button>
+          <div class="identity-col">
+            <input type="text" id="fieldName" class="card-title-input" placeholder="她／他叫什麼？"
+                   oninput="editorSetName(this.value)" autocomplete="off">
+            <input type="text" id="fieldAlias" class="alias-input" placeholder="別名／稱號"
+                   oninput="editorSetAlias(this.value)" autocomplete="off">
+            <div class="meter-row">
+              <div class="meter"><span id="editorMeterBar"></span></div>
+              <span class="meter-text" id="editorMeterText"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="avatar-btns">
+          <button type="button" class="mini-btn" onclick="triggerAvatarPick()">上傳圖片</button>
+          <button type="button" class="mini-btn" onclick="openIconPickerForCard()">選符號</button>
+          <button type="button" class="mini-btn danger" id="avatarRemoveBtn" onclick="removeAvatar()" style="display:none;">移除圖片</button>
+        </div>
+        <input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="handleAvatarFile(event)">
+
+        <div class="edit-block">
+          <div class="block-head">
+            <h2>分類與作品</h2>
+            <span class="block-hint" id="editorColorName"></span>
+          </div>
+          <div class="palette-row-wrap" id="editorColorRow"></div>
+          <label class="field-label" for="editorGroupSelect">收在哪個作品裡</label>
+          <select id="editorGroupSelect" class="text-input" onchange="editorChangeGroup(this.value)"></select>
+        </div>
+
+        <div class="edit-block">
+          <div class="block-head">
+            <h2>一句話簡介</h2>
+            <span class="block-hint">卡片牆上顯示的就是這一句</span>
+          </div>
+          <textarea id="fieldTagline" class="text-input" rows="2"
+                    placeholder="如果只能用一句話介紹這個角色，你會怎麼說？"
+                    oninput="editorSetTagline(this.value)"></textarea>
+        </div>
+
+        <div class="edit-block">
+          <div class="block-head">
+            <h2>資料列</h2>
+            <span class="block-hint">短短一行的東西，欄位名稱可以自己改</span>
+          </div>
+          <div id="editorFieldList"></div>
+          <button type="button" class="add-row-btn" id="addFieldBtn" onclick="addEditorField()">＋ 加一列</button>
+        </div>
+
+        <div class="edit-block">
+          <div class="block-head">
+            <h2>設定段落</h2>
+            <span class="block-hint">大段的文字，順序可以調</span>
+          </div>
+          <div id="editorSectionList"></div>
+          <button type="button" class="add-row-btn" id="addSectionBtn" onclick="addEditorSection()">＋ 加一個段落</button>
+        </div>
+
+        <div class="edit-block">
+          <div class="block-head">
+            <h2>標籤</h2>
+            <span class="block-hint">用逗號或空白分隔，離開輸入框就會整理好</span>
+          </div>
+          <input type="text" id="fieldTags" class="text-input" placeholder="騎士、主角群、劍"
+                 onblur="editorCommitTags()" autocomplete="off">
+          <div class="suggest-row" id="tagSuggestRow"></div>
+        </div>
+      </div>
+
       <div class="modal-actions">
         <button class="btn btn-secondary" id="detailFavBtn" onclick="toggleOpenedFavorite()">☆ 我的最愛</button>
+        <button class="btn btn-secondary" onclick="addOpenedCardToCanvas()">🕸️ 加到關係圖</button>
         <button class="btn btn-secondary" onclick="copyOpenedCardText()">複製文字</button>
         <button class="btn btn-secondary" onclick="duplicateOpenedCard()">複製卡片</button>
         <button class="btn btn-danger" onclick="deleteOpenedCard()">刪除</button>
-        <button class="btn btn-primary" onclick="editOpenedCard()">編輯</button>
-        <button class="btn btn-secondary" onclick="closeCardDetail()">關閉</button>
+        <button class="btn btn-primary" onclick="closeCardModal()">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 關係線 ========== -->
+  <div class="modal-overlay" id="edgeModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">🔗 這是什麼關係</div>
+        <button class="icon-sm-btn" title="關閉" onclick="closeEdgeModal()">✕</button>
+      </div>
+      <p class="modal-hint" id="edgeEndpoints"></p>
+
+      <label class="field-label" for="edgeLabelInput">關係說明</label>
+      <input type="text" id="edgeLabelInput" class="text-input" placeholder="例如：師徒、宿敵、互相看不順眼但性命相托">
+
+      <label class="field-label">線的顏色</label>
+      <div class="edge-color-row" id="edgeColorRow"></div>
+
+      <label class="field-label">箭頭方向</label>
+      <div class="edge-arrow-row" id="edgeArrowRow">
+        <button type="button" class="filter-chip" data-arrow="none" onclick="setEdgeArrow('none')">— 沒有方向</button>
+        <button type="button" class="filter-chip" data-arrow="to" onclick="setEdgeArrow('to')">→ 單向</button>
+        <button type="button" class="filter-chip" data-arrow="both" onclick="setEdgeArrow('both')">↔ 雙向</button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-danger" onclick="deleteEdge()">刪掉這條線</button>
+        <button class="btn btn-primary" onclick="saveEdgeModal()">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 加入角色到關係圖 ========== -->
+  <div class="modal-overlay" id="addNodeModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">＋ 加入角色</div>
+        <button class="icon-sm-btn" title="關閉" onclick="closeAddNodeModal()">✕</button>
+      </div>
+      <p class="modal-hint">點一個角色把他放到關係圖上，可以連續點好幾個。</p>
+      <div class="add-node-list" id="addNodeList"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="addAllCardsToCanvas()">全部加進來</button>
+        <button class="btn btn-primary" onclick="closeAddNodeModal()">完成</button>
       </div>
     </div>
   </div>
@@ -547,14 +612,15 @@
        （isSafeImageSrc、dedupeTags、formatTime）在 storage.js 載入時就會被
        呼叫到，所以 main.js 必須排在 storage.js 前面。改順序前請先看
        tests/shell-manifest.test.js。 -->
-  <script src="js/state.js?v=5"></script>
-  <script src="js/main.js?v=5"></script>
-  <script src="js/storage.js?v=5"></script>
-  <script src="js/cards.js?v=5"></script>
-  <script src="js/editor.js?v=5"></script>
-  <script src="js/modal.js?v=5"></script>
-  <script src="js/import-export.js?v=5"></script>
-  <script src="js/theme.js?v=5"></script>
-  <script src="js/app.js?v=5"></script>
+  <script src="js/state.js?v=6"></script>
+  <script src="js/main.js?v=6"></script>
+  <script src="js/storage.js?v=6"></script>
+  <script src="js/cards.js?v=6"></script>
+  <script src="js/editor.js?v=6"></script>
+  <script src="js/canvas.js?v=6"></script>
+  <script src="js/modal.js?v=6"></script>
+  <script src="js/import-export.js?v=6"></script>
+  <script src="js/theme.js?v=6"></script>
+  <script src="js/app.js?v=6"></script>
 </body>
 </html>

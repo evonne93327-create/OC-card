@@ -11,31 +11,10 @@
 
 const EDITOR_SAVE_DELAY_MS = 600;
 
+/* 打開某張卡的編輯模式。卡片視窗本身的開關在 js/cards.js，
+   這裡只負責「把表單填好」。 */
 function openEditor(id) {
-  const card = findCard(id);
-  if (!card) return;
-  // 換一張卡之前先把上一張還沒寫進去的補存，不然切太快會掉最後幾個字
-  flushEditorDraft();
-  if (activeView === "wall") rememberWallScroll();
-  editingCardId = id;
-  renderEditor();
-  switchView("card");
-  renderCharList();
-  // 新卡片一開起來就把游標放在名字上：這時使用者腦子裡想的就是名字
-  if (!card.name) {
-    const input = el("fieldName");
-    if (input) input.focus();
-  }
-}
-
-/* 預覽：開那張展示用的詳情卡。
-
-   編輯器是「一格一格填」的介面，看不出成品長什麼樣；預覽就是給這件事的。
-   先 flush 再開，不然剛打的最後一句話不會出現在預覽裡。 */
-function previewEditingCard() {
-  if (!editingCardId) return;
-  flushEditorDraft();
-  openCardDetail(editingCardId);
+  openCardModal(id, "edit");
 }
 
 /* 把還沒寫進 localStorage 的修改補存。離開編輯器、切到背景、關分頁
@@ -63,8 +42,8 @@ function markEditorDirty() {
     saveData();
     renderEditorSavedMark("已儲存");
     renderEditorMeter();
-    // 側欄那一列的名字／別名要跟著改。放在存檔後而不是每個按鍵都重畫，
-    // 角色多的時候才不會每打一個字就重建整份清單
+    /* 側欄那一列的名字要跟著改。放在存檔後而不是每個按鍵都重畫，
+       角色多的時候才不會每打一個字就重建整份清單。 */
     renderCharList();
   }, EDITOR_SAVE_DELAY_MS);
 }
@@ -499,29 +478,6 @@ function autoGrowTextarea(area) {
 
 
 /* ---------- 編輯器上的其他動作 ---------- */
-
-function deleteEditingCard() {
-  const id = editingCardId;
-  if (!id) return;
-  const card = findCard(id);
-  if (!card) return;
-  if (!confirm("要把「" + (card.name || "未命名角色") + "」移到垃圾桶嗎？\n（60 天內都可以還原）")) return;
-  editingCardId = null;
-  editorDirty = false;
-  clearTimeout(editorAutosaveTimer);
-  editorAutosaveTimer = null;
-  deleteCard(id, { silent: true });
-  saveData();
-  switchView("wall");
-  renderWall();
-  toast("已移到垃圾桶");
-}
-
-function duplicateEditingCard() {
-  if (!editingCardId) return;
-  flushEditorDraft();
-  duplicateCard(editingCardId);
-}
 
 function openIconPickerForCard() {
   iconPickerTarget = "card";

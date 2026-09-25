@@ -74,9 +74,9 @@ function renderWall() {
 function renderCharList() {
   const box = el("charList");
   if (!box) return;
+  const list = visibleCards();
   box.innerHTML = "";
 
-  const list = visibleCards();
   if (!list.length) {
     const empty = document.createElement("p");
     empty.className = "list-empty";
@@ -89,16 +89,18 @@ function renderCharList() {
   list.forEach(function(card) {
     const pal = getPalette(card.color);
 
+    /* 一行一個角色，照 world_2 目錄列的尺寸：小圖示、名字、右邊一顆分類
+       色點。原本做成「圓形頭像＋名字＋別名」兩行，看起來像通訊錄而不是
+       目錄，而且一個畫面只放得下六七個人。 */
     const row = document.createElement("button");
     row.type = "button";
     row.className = "node-row";
-    if (card.id === editingCardId && activeView === "card") row.classList.add("active");
+    if (card.id === editingCardId) row.classList.add("active");
     if (isBatchMode && batchSelected.has(card.id)) row.classList.add("batch-checked");
+    row.title = card.name || "未命名角色";
 
     const icon = document.createElement("span");
     icon.className = "node-icon";
-    icon.style.background = pal.bg;
-    icon.style.color = pal.text;
     if (card.avatar && isSafeImageSrc(card.avatar)) {
       const img = document.createElement("img");
       img.src = card.avatar;
@@ -110,21 +112,10 @@ function renderCharList() {
     }
     row.appendChild(icon);
 
-    const text = document.createElement("span");
-    text.className = "node-text";
     const name = document.createElement("span");
     name.className = "node-name";
     name.textContent = card.name || "未命名角色";
-    text.appendChild(name);
-    // 副標優先顯示別名，沒有別名就顯示第一個標籤——兩者都沒有就不佔一行
-    const sub = card.alias || (card.tags || [])[0] || "";
-    if (sub) {
-      const subEl = document.createElement("span");
-      subEl.className = "node-sub";
-      subEl.textContent = card.alias ? sub : "#" + sub;
-      text.appendChild(subEl);
-    }
-    row.appendChild(text);
+    row.appendChild(name);
 
     if (card.favorite) {
       const star = document.createElement("span");
@@ -133,9 +124,15 @@ function renderCharList() {
       row.appendChild(star);
     }
 
+    const dot = document.createElement("span");
+    dot.className = "node-dot";
+    dot.style.background = pal.text;
+    dot.title = pal.name;
+    row.appendChild(dot);
+
     row.onclick = function() {
       if (isBatchMode) { toggleBatchSelect(card.id); return; }
-      openEditor(card.id);
+      openCardModal(card.id, "view");
       closeSidebarMobile();
     };
     box.appendChild(row);
@@ -297,7 +294,7 @@ function buildCardEl(card) {
 
   box.onclick = function() {
     if (isBatchMode) { toggleBatchSelect(card.id); return; }
-    openCardDetail(card.id);
+    openCardModal(card.id, "view");
   };
   box.onkeydown = function(e) {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); box.click(); }
@@ -459,7 +456,7 @@ function toggleFavorite(id) {
   // 推到「最近修改」的最前面會讓排序失真
   saveData();
   renderWall();
-  if (openedCardId === id) renderCardDetail();
+  if (editingCardId === id && cardModalMode === "view") renderCardDetail();
 }
 
 function createCard() {
@@ -477,7 +474,8 @@ function createCard() {
   });
   appData.cards.push(card);
   saveData();
-  openEditor(card.id);
+  renderWall();
+  openCardModal(card.id, "edit");
 }
 
 function duplicateCard(id) {
@@ -491,7 +489,7 @@ function duplicateCard(id) {
   copy.updatedAt = copy.createdAt;
   appData.cards.push(ensureCardShape(copy));
   saveData();
-  closeCardDetail();
+  closeCardModal();
   renderWall();
   toast("已複製一張卡片");
 }
@@ -516,17 +514,31 @@ function deleteCard(id, opts) {
   /* 被刪掉的正好是編輯器開著的那張，就把編輯器放掉。
      不放的話 editingCardId 會指向一張不存在的卡，之後每次 markEditorDirty()
      都找不到東西可改——畫面上還打得動字，但什麼都沒存進去。 */
+  /* 關係圖上那個節點與它的連線也要一起收掉，否則圖上會留下一個
+     指向垃圾桶裡的卡片的空節點。還原卡片時節點不會自己回來——
+     那是刻意的，重新加一次比留著一個半殘的節點好。 */
+  appData.groups.forEach(function(g) {
+    if (!g.canvas) return;
+    const gone = g.canvas.nodes.filter(function(n) { return n.cardId === id; })
+      .map(function(n) { return n.id; });
+    if (!gone.length) return;
+    g.canvas.nodes = g.canvas.nodes.filter(function(n) { return n.cardId !== id; });
+    g.canvas.edges = g.canvas.edges.filter(function(e) {
+      return gone.indexOf(e.source) < 0 && gone.indexOf(e.target) < 0;
+    });
+  });
+
   if (editingCardId === id) {
     editingCardId = null;
     editorDirty = false;
     clearTimeout(editorAutosaveTimer);
     editorAutosaveTimer = null;
-    if (activeView === "card") switchView("wall");
-    else document.body.classList.add("no-card-open");
+    const modal = el("cardModal");
+    if (modal) modal.classList.remove("active");
   }
   if (!silent) {
     saveData();
-    closeCardDetail();
+    closeCardModal();
     renderWall();
     toast("已移到垃圾桶");
   }
@@ -641,23 +653,51 @@ function batchMoveTo(groupId) {
 }
 
 
-/* ---------- 卡片詳情 ---------- */
+/* ---------- 卡片視窗 ----------
 
-function openCardDetail(id) {
-  openedCardId = id;
-  renderCardDetail();
-  const modal = el("cardDetailModal");
-  if (modal) modal.classList.add("active");
+   檢視與編輯是同一個視窗的兩個模式，不是兩個地方。編輯永遠是即時存檔
+   （見 js/editor.js），所以切模式、關視窗都不需要問「要不要儲存」。 */
+
+function openCardModal(id, mode) {
+  const card = findCard(id);
+  if (!card) return;
+  // 換一張卡之前先把上一張還沒寫進去的補存，切太快才不會掉字
+  if (editingCardId && editingCardId !== id) flushEditorDraft();
+  editingCardId = id;
+  setCardModalMode(mode === "edit" ? "edit" : "view");
+  el("cardModal").classList.add("active");
+  renderCharList();
 }
 
-function closeCardDetail() {
-  openedCardId = null;
-  const modal = el("cardDetailModal");
-  if (modal) modal.classList.remove("active");
+function closeCardModal() {
+  flushEditorDraft();
+  editingCardId = null;
+  el("cardModal").classList.remove("active");
+  renderWall();
+}
+
+function setCardModalMode(mode) {
+  cardModalMode = mode === "edit" ? "edit" : "view";
+  document.body.classList.toggle("card-editing", cardModalMode === "edit");
+
+  const viewBtn = el("cardModeViewBtn");
+  const editBtn = el("cardModeEditBtn");
+  if (viewBtn) viewBtn.classList.toggle("active", cardModalMode === "view");
+  if (editBtn) editBtn.classList.toggle("active", cardModalMode === "edit");
+
+  if (cardModalMode === "edit") {
+    renderEditor();
+  } else {
+    // 切回檢視之前先補存：剛打的最後一句話要看得到
+    flushEditorDraft();
+    renderCardDetail();
+  }
+  const mark = el("editorSaveMark");
+  if (mark && cardModalMode === "view") mark.textContent = "";
 }
 
 function renderCardDetail() {
-  const card = findCard(openedCardId);
+  const card = findCard(editingCardId);
   const body = el("cardDetailBody");
   if (!card || !body) return;
   const pal = getPalette(card.color);
@@ -739,8 +779,7 @@ function renderCardDetail() {
     sec.appendChild(title);
 
     const p = document.createElement("p");
-    // 段落是多行純文字。白色空白要保留（使用者是照著自己的排版打的），
-    // 用 CSS 的 white-space: pre-wrap 處理，不要把換行轉成 <br>
+    // 段落是多行純文字，使用者自己排的換行要保留（CSS 的 white-space: pre-wrap）
     p.textContent = s.text || "（還沒寫）";
     if (!s.text) p.classList.add("is-blank");
     sec.appendChild(p);
@@ -761,6 +800,12 @@ function renderCardDetail() {
     body.appendChild(tagBox);
   }
 
+  /* 這個角色在關係圖上的線，直接列在卡片底下。
+
+     關係寫在「人際關係」那個段落裡是純文字，改了關係圖不會同步；
+     這一段是真的從圖上讀出來的，兩邊永遠一致。 */
+  renderCardRelations(body, card);
+
   const star = el("detailFavBtn");
   if (star) {
     star.textContent = card.favorite ? "★ 我的最愛" : "☆ 我的最愛";
@@ -768,29 +813,69 @@ function renderCardDetail() {
   }
 }
 
-function editOpenedCard() {
-  const id = openedCardId;
-  closeCardDetail();
-  if (id) openEditor(id);
+function renderCardRelations(body, card) {
+  const canvas = currentCanvas();
+  const node = canvas.nodes.find(function(n) { return n.cardId === card.id; });
+  if (!node) return;
+
+  const related = canvas.edges.filter(function(e) {
+    return e.source === node.id || e.target === node.id;
+  });
+  if (!related.length) return;
+
+  const sec = document.createElement("section");
+  sec.className = "detail-section";
+  const title = document.createElement("h3");
+  title.textContent = "關係圖上的連線";
+  sec.appendChild(title);
+
+  const list = document.createElement("div");
+  list.className = "relation-list";
+  related.forEach(function(e) {
+    const otherId = e.source === node.id ? e.target : e.source;
+    const other = nodeCard(findNode(otherId));
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "relation-row";
+    row.onclick = function() { openEdgeModal(e.id); };
+
+    const dot = document.createElement("span");
+    dot.className = "relation-dot";
+    dot.style.background = getEdgeStroke(e.color);
+    row.appendChild(dot);
+
+    const who = document.createElement("strong");
+    who.textContent = other ? (other.name || "未命名角色") : "（已刪除）";
+    row.appendChild(who);
+
+    const label = document.createElement("span");
+    label.textContent = e.label || "（還沒寫關係）";
+    if (!e.label) label.classList.add("is-blank");
+    row.appendChild(label);
+
+    list.appendChild(row);
+  });
+  sec.appendChild(list);
+  body.appendChild(sec);
 }
 
 function toggleOpenedFavorite() {
-  if (openedCardId) toggleFavorite(openedCardId);
+  if (editingCardId) toggleFavorite(editingCardId);
 }
 
 function deleteOpenedCard() {
-  if (openedCardId) deleteCard(openedCardId);
+  if (editingCardId) deleteCard(editingCardId);
 }
 
 function duplicateOpenedCard() {
-  if (openedCardId) duplicateCard(openedCardId);
+  if (editingCardId) duplicateCard(editingCardId);
 }
 
 /* 把這張卡複製成純文字，方便貼到 Discord、噗浪或任何地方。
    Clipboard API 在非 https 與舊瀏覽器上不存在，所以要留退路——
    複製失敗卻什麼都不說，使用者會一直按同一顆按鈕。 */
 function copyOpenedCardText() {
-  const card = findCard(openedCardId);
+  const card = findCard(editingCardId);
   if (!card) return;
   const text = cardToPlainText(card);
 

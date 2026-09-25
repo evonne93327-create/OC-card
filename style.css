@@ -13,7 +13,7 @@
   /* 這份 CSS 是哪一版。js/app.js 會把它跟 APP_BUILD 比對——對不上就代表
      瀏覽器拿到的 HTML 與 CSS 不是同一版（快取錯配），版面一定是散的。
      必須跟 sw.js 的 VERSION 一致，tests/shell-manifest.test.js 會檢查。 */
-  --css-build: "5";
+  --css-build: "6";
 }
 
 * {
@@ -355,7 +355,7 @@ aside.sidebar-directory.collapsed {
   display: flex;
   align-items: center;
   gap: var(--sp-8);
-  padding: var(--sp-6) var(--sp-8);
+  padding: var(--sp-5) var(--sp-8);
   border-radius: var(--radius-4);
   font-size: var(--fs-14);
   color: var(--text-secondary);
@@ -364,7 +364,7 @@ aside.sidebar-directory.collapsed {
   width: 100%;
   text-align: left;
   background: transparent;
-  margin: var(--sp-2) 0;
+  margin: 1px 0;
   min-width: 0;
 }
 .node-row:hover { background: var(--bg-sunken); color: var(--text-primary); }
@@ -380,29 +380,25 @@ aside.sidebar-directory.collapsed {
   color: var(--select-text);
 }
 
+/* 圖示就是一個 emoji，不要再套一層圓形底色——那會讓每一列變高、
+   整份清單看起來像通訊錄而不是目錄。上傳過頭像的才畫成小圓圖。 */
 .node-icon {
-  width: var(--icon-28);
-  height: var(--icon-28);
-  border-radius: var(--radius-full);
+  width: var(--icon-22);
+  height: var(--icon-22);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--fs-14);
+  font-size: var(--fs-16);
   overflow: hidden;
+  border-radius: var(--radius-full);
   flex-shrink: 0;
 }
 .node-icon img { width: 100%; height: 100%; object-fit: cover; }
 
-.node-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.node-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.node-sub {
-  font-size: var(--fs-10);
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.node-star { font-size: var(--fs-12); color: var(--star); flex-shrink: 0; }
+.node-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node-star { font-size: var(--fs-10); color: var(--star); flex-shrink: 0; }
+/* 分類色點。名字旁邊放整顆色塊太搶眼，一顆小點就夠分辨了 */
+.node-dot { width: 8px; height: 8px; border-radius: var(--radius-full); flex-shrink: 0; }
 
 .list-empty {
   padding: var(--sp-20) var(--sp-12);
@@ -530,8 +526,8 @@ main.content-workspace {
 /* 兩個檢視都留在 DOM 裡（不是每次重建），切回來時捲動位置與輸入焦點
    才不會整個重來。誰在前面由 body 的 data-view 決定。 */
 .view-panel { width: 100%; flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
-body[data-view="wall"] #viewCard,
-body[data-view="card"] #viewWall { display: none; }
+body[data-view="wall"] #viewCanvas,
+body[data-view="canvas"] #viewWall { display: none; }
 
 
 /* ==========================================================
@@ -721,17 +717,6 @@ body[data-view="card"] #viewWall { display: none; }
    角色卡檢視（即時存檔的編輯器）
    ========================================================== */
 
-.editor-meta-panel {
-  background: var(--bg-card);
-  border-bottom: 1px solid var(--border);
-  padding: var(--sp-14) var(--sp-20);
-  flex-shrink: 0;
-}
-.meta-top-row { display: flex; align-items: center; gap: var(--sp-14); }
-.meta-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
-.meta-sub-row { display: flex; align-items: center; gap: var(--sp-10); flex-wrap: wrap; }
-.meta-right-col { display: flex; align-items: center; gap: var(--sp-6); flex-shrink: 0; }
-
 .editor-avatar {
   width: 56px;
   height: 56px;
@@ -771,19 +756,6 @@ body[data-view="card"] #viewWall { display: none; }
   flex: 0 1 200px;
   min-width: 80px;
 }
-.stat-pill {
-  background: var(--bg-sunken);
-  padding: var(--sp-2) var(--sp-8);
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-10);
-  font-weight: 700;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-/* 自動存檔的狀態。刻意做得很小聲——它一直在變，做得顯眼會讓人分心，
-   但完全不顯示又會讓人不放心「到底存了沒」。 */
-.save-mark { font-size: var(--fs-10); color: var(--text-muted); white-space: nowrap; }
-
 /* 完成度量表。寬度一定要收窄：拉滿整列的話它會變成角色名底下的一條
    粗底線，看起來像分隔線而不是一個量表。 */
 .meter {
@@ -794,33 +766,6 @@ body[data-view="card"] #viewWall { display: none; }
   overflow: hidden;
 }
 .meter span { display: block; height: 100%; transition: width 0.2s ease; }
-
-.action-pill-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-7) var(--sp-10);
-  background: var(--bg-sunken);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  font-size: var(--fs-12);
-  font-weight: 600;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-.action-pill-btn:hover { border-color: var(--border); color: var(--text-primary); }
-.action-pill-btn.danger:hover { background: var(--danger-light); color: var(--danger); border-color: var(--danger-light); }
-
-.editor-content-area {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--sp-20);
-  background: var(--bg-main);
-}
-/* 編輯區不要拉到整個寬螢幕。一行超過七十幾個字就很難讀，
-   而且欄位左右跑太開，眼睛要來回掃。 */
-.edit-inner { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-16); }
 
 .edit-block {
   padding: var(--sp-16);
@@ -968,10 +913,108 @@ textarea.text-input { resize: vertical; line-height: 1.8; }
 
 /* 還沒選角色時整片蓋住編輯器。用覆蓋而不是清空內容：
    輸入框的值留在原地，選了角色之後直接重填就好。 */
-.editor-empty {
+
+/* ==========================================================
+   關係圖
+   ========================================================== */
+
+.canvas-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-10);
+  padding: var(--sp-8) var(--sp-16);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+.canvas-bar-right { display: flex; align-items: center; gap: var(--sp-6); }
+.canvas-zoom { font-size: var(--fs-10); color: var(--text-muted); min-width: 38px; text-align: right; }
+#connectModeBtn.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent-hover); }
+
+.canvas-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--bg-main);
+  /* 點陣底紋：拖曳與縮放時有了參考點，才看得出畫面在動 */
+  background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
+  background-size: 22px 22px;
+  touch-action: none;      /* 自己處理拖曳與雙指縮放，交給瀏覽器會變成捲頁 */
+  cursor: grab;
+}
+.canvas-stage.panning { cursor: grabbing; }
+
+.canvas-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.edge-line { pointer-events: none; }
+.edge-hit { cursor: pointer; }
+.edge-label { font-size: 11px; font-weight: 600; cursor: pointer; font-family: var(--font-ui); }
+.edge-label-bg { fill: var(--bg-main); opacity: 0.88; }
+
+/* 節點層跟 SVG 疊在一起，用同一組平移縮放。
+   transform-origin 一定要是左上角：中心點的話，節點座標與 svg 的 viewBox
+   會對不上，線會離節點越來越遠。
+
+   pointer-events: none 是必要的，不是最佳化：這一層是 inset:0 的整片
+   透明 div，蓋在 SVG 上面。不關掉的話，它會把所有點擊都吃掉——關係線
+   點不到（那是編輯關係的唯一入口）、空白處也拖不動畫面。
+   節點本身再把事件開回來。 */
+.canvas-nodes { position: absolute; inset: 0; transform-origin: 0 0; pointer-events: none; }
+.canvas-node { pointer-events: auto; }
+
+.canvas-node {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-10);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.canvas-node.dragging { cursor: grabbing; box-shadow: var(--shadow-md); z-index: 5; }
+.canvas-node.connecting { box-shadow: 0 0 0 3px var(--accent); }
+.canvas-node-face {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-16);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-card);
+}
+.canvas-node-face img { width: 100%; height: 100%; object-fit: cover; }
+.canvas-node-text { min-width: 0; display: flex; flex-direction: column; }
+.canvas-node-text strong { font-size: var(--fs-12); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.canvas-node-text span { font-size: var(--fs-10); opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.canvas-hint {
+  position: absolute;
+  left: 50%;
+  top: var(--sp-12);
+  transform: translateX(-50%);
+  padding: var(--sp-6) var(--sp-12);
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  display: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.canvas-hint.show { display: block; }
+
+.canvas-empty {
   position: absolute;
   inset: 0;
-  background: var(--bg-main);
   display: none;
   flex-direction: column;
   align-items: center;
@@ -979,9 +1022,25 @@ textarea.text-input { resize: vertical; line-height: 1.8; }
   gap: var(--sp-8);
   text-align: center;
   padding: var(--sp-20);
-  z-index: 5;
+  pointer-events: none;
 }
-body.no-card-open .editor-empty { display: flex; }
+.canvas-empty.show { display: flex; }
+.canvas-empty .empty-actions { display: flex; gap: var(--sp-8); pointer-events: auto; flex-wrap: wrap; justify-content: center; }
+
+.edge-color-row { display: flex; gap: var(--sp-8); flex-wrap: wrap; }
+.edge-color-dot {
+  width: var(--icon-28);
+  height: var(--icon-28);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  padding: 0;
+}
+.edge-color-dot.on { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--text-primary); }
+.edge-arrow-row { display: flex; gap: var(--sp-6); flex-wrap: wrap; }
+.edge-arrow-row .filter-chip.on { background: var(--accent-light); border-color: var(--accent-line); color: var(--accent-text); }
+
+.add-node-list { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 50vh; overflow-y: auto; }
+.add-node-list .node-row { border: 1px solid var(--border); background: var(--bg-sunken); }
 
 
 /* ==========================================================
@@ -1044,6 +1103,66 @@ body.no-card-open .editor-empty { display: flex; }
 .btn-danger { background: var(--bg-card); border-color: var(--danger-light); color: var(--danger); }
 .btn-danger:hover { background: var(--danger-light); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---------- 卡片視窗（檢視／編輯二合一） ---------- */
+
+.card-modal { gap: var(--sp-14); }
+.card-mode-switch {
+  display: flex;
+  background: var(--bg-sunken);
+  padding: var(--sp-2);
+  border-radius: var(--radius-md);
+  gap: var(--sp-2);
+  flex: 1;
+}
+.mode-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: var(--sp-6) var(--sp-10);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.mode-btn.active { background: var(--bg-card); color: var(--accent-text); box-shadow: var(--shadow-sm); }
+
+/* 兩個模式共用同一個視窗：誰顯示由 body 的 class 決定。
+   兩邊都留在 DOM 裡，切回來時輸入框的值與捲動位置不會重來。 */
+#cardEditBody { display: none; flex-direction: column; gap: var(--sp-14); }
+body.card-editing #cardDetailBody { display: none; }
+body.card-editing #cardEditBody { display: flex; }
+
+.card-modal .edit-identity {
+  display: flex;
+  gap: var(--sp-12);
+  align-items: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+.card-modal .identity-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
+
+/* 關係圖上的連線，列在卡片底下 */
+.relation-list { display: flex; flex-direction: column; gap: var(--sp-4); }
+.relation-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  width: 100%;
+  padding: var(--sp-6) var(--sp-8);
+  background: var(--bg-sunken);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  font-size: var(--fs-12);
+}
+.relation-row:hover { border-color: var(--accent-line); }
+.relation-row strong { flex-shrink: 0; }
+.relation-row span { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.relation-dot { width: 10px; height: 10px; border-radius: var(--radius-full); flex-shrink: 0; }
+
 
 /* ---------- 卡片詳情 ---------- */
 
@@ -1239,7 +1358,6 @@ button.settings-row:hover { background: var(--bg-sunken); border-color: var(--ac
   .nav-action-btn { padding: var(--sp-7) var(--sp-10); }
   .nav-world-btn { max-width: 24vw; }
   .top-nav-bar { gap: var(--sp-6); }
-  .editor-content-area { padding: var(--sp-16); }
 }
 
 /* 大螢幕：卡片可以大一點，留白也給多一些 */
@@ -1323,17 +1441,15 @@ button.settings-row:hover { background: var(--bg-sunken); border-color: var(--ac
   .top-nav-bar { padding-left: var(--sp-10); padding-right: var(--sp-10); }
 
   .nav-btn-icon:active, .icon-sm-btn:active,
-  .action-pill-btn:active, .nav-action-btn:active,
+  .nav-action-btn:active,
   .world-rail-btn:active { transform: scale(0.94); opacity: 0.85; }
 
-  .wall-bar { padding: var(--sp-8) var(--sp-10); }
+  .wall-bar, .canvas-bar { padding: var(--sp-8) var(--sp-10); }
+  .canvas-node { padding: var(--sp-6) var(--sp-8); }
   .wall-scroll { padding: var(--sp-10); }
-  .editor-meta-panel { padding: var(--sp-10) var(--sp-12); }
-  .editor-content-area { padding: var(--sp-12) var(--sp-10); }
-  .meta-top-row { flex-wrap: wrap; row-gap: var(--sp-8); }
-  .meta-right-col { width: 100%; justify-content: flex-end; }
   .editor-avatar { width: 48px; height: 48px; font-size: var(--fs-22); }
   .card-title-input { font-size: var(--fs-18); }
+  .card-modal .edit-identity { gap: var(--sp-10); }
 
   .node-row { padding: var(--sp-8); min-height: 44px; border-radius: var(--radius-8); }
   .node-row:active { background: var(--bg-sunken); }
@@ -1379,7 +1495,6 @@ button.settings-row:hover { background: var(--bg-sunken); border-color: var(--ac
   .oc-card { padding: var(--sp-12) var(--sp-10) var(--sp-10); }
   .card-name { font-size: var(--fs-16); }
 
-  .editor-meta-panel { padding: var(--sp-6) var(--sp-12); }
   .editor-avatar { width: 40px; height: 40px; font-size: var(--fs-18); }
   .meter { display: none; }        /* 橫放時這條可有可無，把高度讓出來 */
 
